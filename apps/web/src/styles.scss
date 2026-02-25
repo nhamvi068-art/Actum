@@ -1,0 +1,847 @@
+/* Omni Canvas - 保留原始 Nebula 背景样式 + 参考图布局 */
+
+:root {
+  --primary-color: #8B5CF6;
+  --primary-hover: #7c3aed;
+  --text-main: #374151;
+  --text-muted: #6b7280;
+  --text-light: #9ca3af;
+  --bg-color: #ffffff;
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* ========== 原始 Nebula 背景动画 ========== */
+.page-background {
+  position: absolute;
+  inset: 0;
+  background: white;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.nebula-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  max-width: 1400px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: spin-slow 40s linear infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes liquid {
+  0% { transform: translate(0px, 0px) scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  15% { transform: translate(-100px, -80px) scale(1.2); border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
+  33% { transform: translate(80px, -120px) scale(0.9); border-radius: 20% 80% 20% 80% / 80% 20% 80% 20%; }
+  50% { transform: translate(-80px, 100px) scale(1.1); border-radius: 70% 30% 40% 60% / 50% 60% 30% 50%; }
+  66% { transform: translate(100px, -50px) scale(0.85); border-radius: 40% 60% 70% 30% / 40% 50% 30% 60%; }
+  85% { transform: translate(-50px, 50px) scale(1.05); border-radius: 70% 30% 40% 60% / 50% 60% 30% 50%; }
+  100% { transform: translate(0px, 0px) scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+}
+
+@keyframes separate-fuse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--blob-color); }
+  50% { box-shadow: 60px -60px 0 -15px var(--blob-color), -60px 60px 0 -15px var(--blob-color); }
+}
+
+@keyframes color-breathe {
+  0%, 100% { background-color: var(--blob-color); }
+  50% { background-color: #C084FC; }
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  mix-blend-mode: multiply;
+  filter: blur(100px);
+  opacity: 0.6;
+}
+
+.blob-1 {
+  top: 10%;
+  left: 10%;
+  width: 70%;
+  height: 60%;
+  background: #60A5FA;
+  animation: liquid 14s ease-in-out infinite,
+             separate-fuse 7s ease-in-out infinite,
+             color-breathe 10s ease-in-out infinite;
+  --blob-color: #60A5FA;
+}
+
+.blob-2 {
+  top: 10%;
+  right: 10%;
+  width: 70%;
+  height: 60%;
+  background: #818CF8;
+  animation: liquid 14s ease-in-out infinite 3s,
+             separate-fuse 7s ease-in-out infinite 3s,
+             color-breathe 10s ease-in-out infinite 3s;
+  --blob-color: #818CF8;
+}
+
+.blob-3 {
+  bottom: 10%;
+  left: 10%;
+  width: 70%;
+  height: 60%;
+  background: #C084FC;
+  animation: liquid 14s ease-in-out infinite 6s,
+             separate-fuse 7s ease-in-out infinite 6s,
+             color-breathe 10s ease-in-out infinite 6s;
+  --blob-color: #C084FC;
+}
+
+/* ========== Layout Container ========== */
+.page-container {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+/* ========== Header ========== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.2s;
+  background: transparent;
+  border: none;
+}
+
+.header-icon:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* ========== Main Content ========== */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 80px;
+  padding-bottom: 80px;
+  padding-left: 48px;
+  padding-right: 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.hero-section {
+  text-align: center;
+  margin-bottom: 48px;
+  width: 100%;
+}
+
+.hero-title {
+  font-size: 48px;
+  font-weight: 500;
+  color: var(--text-main);
+  margin: 0 0 12px 0;
+  letter-spacing: -0.02em;
+}
+
+.hero-subtitle {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ========== Action Bar ========== */
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.btn-new-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  color: white;
+  background: var(--primary-color);
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.btn-new-project:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.btn-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-main);
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-filter:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+/* ========== Project Grid ========== */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+  width: 100%;
+  max-width: 1200px;
+}
+
+/* ========== Project Card ========== */
+.project-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: var(--card-shadow);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  position: relative;
+}
+
+.project-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.12);
+}
+
+.card-preview {
+  height: 180px;
+  background: #f8fafc;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-preview.has-thumbnail {
+  display: block;
+  padding: 0;
+}
+
+.card-preview.has-thumbnail .preview-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card-preview:not(.has-thumbnail) {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.preview-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
+  font-size: 24px;
+}
+
+.card-info {
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-main);
+  margin: 0 0 6px 0;
+}
+
+.card-meta {
+  font-size: 13px;
+  color: var(--text-light);
+  margin: 0;
+}
+
+.card-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.project-card:hover .card-actions {
+  opacity: 1;
+}
+
+.btn-delete {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-muted);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-delete:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+/* ========== Empty State ========== */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 24px;
+  border: 1px dashed #e5e7eb;
+  max-width: 480px;
+  width: 100%;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-main);
+  margin: 0 0 8px 0;
+}
+
+.empty-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ========== Footer ========== */
+.page-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 0;
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.footer-links {
+  display: flex;
+  gap: 24px;
+}
+
+.footer-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover {
+  color: var(--text-main);
+}
+
+/* ========== Canvas Page ========== */
+.canvas-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.canvas-header {
+  height: 56px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.canvas-header .back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.canvas-header .back-btn:hover {
+  color: var(--text-main);
+  background: #f3f4f6;
+}
+
+.canvas-header .divider {
+  height: 24px;
+  width: 1px;
+  background: #e5e7eb;
+}
+
+.canvas-header .project-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+/* Styles for header elements inside app-toolbar */
+.toolbar-header-right {
+  display: flex;
+  align-items: center;
+}
+
+.app-toolbar .divider {
+  height: 20px;
+  width: 1px;
+  background: #e5e7eb;
+}
+
+.app-toolbar .project-name {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  cursor: default;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.app-toolbar .project-name:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.app-toolbar .project-name-input {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  padding: 4px 8px;
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  outline: none;
+  background: white;
+  min-width: 100px;
+  max-width: 200px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.canvas-main {
+  flex: 1;
+  position: relative;
+}
+
+/* ========== Delete Confirmation Modal ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 12px 0;
+}
+
+.modal-message {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 24px 0;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-cancel {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.btn-confirm-delete {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  background: #ef4444;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-confirm-delete:hover {
+  background: #dc2626;
+}
+
+/* ========== API 配置弹窗样式 ========== */
+.api-config-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.api-config-modal {
+  max-width: 480px;
+  width: 90%;
+  padding: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.api-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.api-config-header .modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.btn-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-muted);
+}
+
+.btn-close:hover {
+  background: #f3f4f6;
+  color: var(--text-main);
+}
+
+.api-config-body {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-main);
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.form-input::placeholder {
+  color: var(--text-light);
+}
+
+.input-wrapper .form-input {
+  padding-right: 44px;
+}
+
+.btn-toggle-visibility {
+  position: absolute;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.btn-toggle-visibility:hover {
+  background: #f3f4f6;
+  color: var(--text-main);
+}
+
+.validation-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.validation-message.success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.validation-message.error {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.validation-message.validating {
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.validation-message .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.api-config-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-validate {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--primary-color);
+  background: white;
+  border: 1px solid var(--primary-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-validate:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.btn-validate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.footer-actions .btn-cancel {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.footer-actions .btn-cancel:hover {
+  background: #f3f4f6;
+}
+
+.footer-actions .btn-save {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  background: var(--primary-color);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.footer-actions .btn-save:hover {
+  background: var(--primary-hover);
+}

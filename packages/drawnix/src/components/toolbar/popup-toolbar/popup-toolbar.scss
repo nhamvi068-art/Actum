@@ -1,0 +1,73 @@
+.popup-toolbar {
+    .property-button {
+        height: var(--lg-button-size);
+        width: var(--lg-button-size);
+        .color-label {
+            cursor: pointer;
+        }
+        .fill-label {
+            display: inline-block;
+            width: var(--popup-label-size);
+            height: var(--popup-label-size);
+            border-radius: 50%;
+            &.color-white {
+                border: 1px solid var(--color-gray-30);
+            }
+        }
+        .stroke-label {
+            border-radius: 50%;
+            width: calc(var(--popup-label-size) - var(--border-radius-lg));
+            height: calc(var(--popup-label-size) - var(--border-radius-lg));
+            border-width: var(--border-radius-sm);
+            border-style: solid;
+        }
+        .tool-icon__icon {
+            svg {
+                width: var(--xlg-icon-size);
+                height: var(--xlg-icon-size);
+            }
+        }
+    }
+}
+
+.stroke-setting {
+    &.has-stroke-style {
+        padding-top: 8px !important;
+    }
+    .stroke-style-picker {
+        justify-content: space-between;
+        padding: 0 8px;
+    }
+}
+
+.source-arrow-island .property-button ,.source-arrow-button{
+   transform: rotateY(180deg);
+}
+
+/* 图像编辑覆盖层样式 */
+.image-edit-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+  gap: 20px;
+}
+
+.image-crop-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 80vw;
+  max-height: 70vh;
+  overflow: auto;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 20px;
+}
