@@ -280,7 +280,7 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
       ...selectedImages.map(img => img.url),
     ].filter(Boolean);
 
-    let submitValue = inputValue.trim();
+    const submitValue = inputValue.trim();
     if (submitValue && onSubmit) {
       onSubmit(submitValue, allImages);
       setInputValue('');
@@ -300,7 +300,7 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
       ...selectedImages.map(img => img.url),
     ].filter(Boolean);
 
-    let submitValue = inputValue.trim();
+    const submitValue = inputValue.trim();
     if (submitValue && (onGenerateImage || onGenerateImageWithContext)) {
       // 根据选择的模型和尺寸，映射到实际的模型
       const actualModel = mapToActualModel(selectedModel, selectedSize);
