@@ -6,6 +6,18 @@ import {
 } from './icons';
 import '../styles/ImageEditFull.css';
 import ImageSaveModal from './ImageSaveModal';
+import {
+  autoSaveImageEdit,
+  immediateSaveImageEdit,
+  loadImageEditFromLocalStorage,
+  clearImageEditStorage,
+  undoImageEdit,
+  redoImageEdit,
+  canUndoImageEdit,
+  canRedoImageEdit,
+  loadHistoryFromStorage,
+  clearHistory,
+} from '../utils/canvasStorage';
 
 // 容器尺寸常量
 const CONTAINER_WIDTH = 660; // 900 - 200(侧边栏) - 40(padding)
@@ -76,11 +88,26 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
     dragType: 'move' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | 'resize-n' | 'resize-s' | 'resize-w' | 'resize-e' | null;
     dragStart: { x: number; y: number };
     cropBox: { x: number; y: number; width: number; height: number };
+    rafId: number | null; // requestAnimationFrame ID（性能优化）
+    lastRenderTime: number; // 上次渲染时间（防抖）
+    // 局部重绘相关
+    lastCropBox: { x: number; y: number; width: number; height: number }; // 上一次的裁剪框位置
+    canvasCtx: CanvasRenderingContext2D | null; // Canvas 上下文
+    canvasDpr: number; // 设备像素比
+    canvasOffsetX: number; // 画布偏移X
+    canvasOffsetY: number; // 画布偏移Y
   }>({
     isDragging: false,
     dragType: null,
     dragStart: { x: 0, y: 0 },
-    cropBox: { x: 0, y: 0, width: 0, height: 0 }
+    cropBox: { x: 0, y: 0, width: 0, height: 0 },
+    rafId: null,
+    lastRenderTime: 0,
+    lastCropBox: { x: 0, y: 0, width: 0, height: 0 },
+    canvasCtx: null,
+    canvasDpr: 1,
+    canvasOffsetX: 0,
+    canvasOffsetY: 0
   });
 
   // 初始化完整状态
@@ -137,26 +164,43 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
       // 只有当 imageLoadedRef 为 false 时才初始化
       if (!imageLoadedRef.current) {
         imageLoadedRef.current = true;
-        
+
         const initialScale = calculateInitialScale(imageRef.current.width, imageRef.current.height);
-        
-        setEditState(prev => ({
-          ...prev,
-          cropScale: initialScale,
-          cropBox: {
+
+        // 尝试从本地存储恢复数据
+        const savedData = loadImageEditFromLocalStorage();
+
+        if (savedData && savedData.imageUrl === imageUrl) {
+          // 恢复保存的状态
+          setEditState(prev => ({
+            ...prev,
+            ...savedData.editState,
+            cropScale: initialScale, // 重新计算缩放
+          }));
+          dragRef.current.cropBox = savedData.editState.cropBox;
+        } else {
+          // 使用默认状态
+          setEditState(prev => ({
+            ...prev,
+            cropScale: initialScale,
+            cropBox: {
+              x: 0,
+              y: 0,
+              width: imageRef.current.width,
+              height: imageRef.current.height
+            }
+          }));
+
+          dragRef.current.cropBox = {
             x: 0,
             y: 0,
             width: imageRef.current.width,
             height: imageRef.current.height
-          }
-        }));
-        
-        dragRef.current.cropBox = {
-          x: 0,
-          y: 0,
-          width: imageRef.current.width,
-          height: imageRef.current.height
-        };
+          };
+        }
+
+        // 加载历史记录
+        loadHistoryFromStorage();
       }
     };
   }, [imageUrl, calculateInitialScale]);
@@ -168,8 +212,19 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = CONTAINER_WIDTH;
-    canvas.height = CONTAINER_HEIGHT;
+    // 性能优化1：硬件加速（部分浏览器生效）
+    canvas.style.transform = 'translateZ(0)';
+    canvas.style.willChange = 'transform';
+
+    // 性能优化2：高清屏适配（调整画布分辨率，适配 Retina 屏幕）
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = CONTAINER_WIDTH * dpr;
+    canvas.height = CONTAINER_HEIGHT * dpr;
+    canvas.style.width = `${CONTAINER_WIDTH}px`;
+    canvas.style.height = `${CONTAINER_HEIGHT}px`;
+    ctx.scale(dpr, dpr);
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
 
@@ -199,6 +254,81 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
     }
 
   }, [imageUrl, editState.filterParams, editState.cropScale, editState.rotateDegree, editState.cropBox, editState.activeTab, editState.imageVersion]);
+
+  /**
+   * 局部重绘（性能优化核心：减少画布重绘面积）
+   * @param {Object} prevBox 上一次的裁剪框位置
+   * @param {Object} currentBox 当前的裁剪框位置
+   * @param {CanvasRenderingContext2D} ctx Canvas 上下文
+   * @param {Number} offsetX 画布偏移X
+   * @param {Number} offsetY 画布偏移Y
+   * @param {Number} scale 缩放比例
+   */
+  const redrawPartial = useCallback((
+    prevBox: { x: number; y: number; width: number; height: number },
+    currentBox: { x: number; y: number; width: number; height: number },
+    ctx: CanvasRenderingContext2D,
+    offsetX: number,
+    offsetY: number,
+    scale: number
+  ) => {
+    // 计算需要重绘的区域（包含新旧位置）
+    const minX = Math.min(prevBox.x, currentBox.x) - 1;
+    const minY = Math.min(prevBox.y, currentBox.y) - 1;
+    const maxX = Math.max(prevBox.x + prevBox.width, currentBox.x + currentBox.width) + 1;
+    const maxY = Math.max(prevBox.y + prevBox.height, currentBox.y + currentBox.height) + 1;
+
+    const clearX = offsetX + minX * scale;
+    const clearY = offsetY + minY * scale;
+    const clearWidth = (maxX - minX) * scale;
+    const clearHeight = (maxY - minY) * scale;
+
+    // 清除重绘区域
+    ctx.save();
+    ctx.clearRect(clearX, clearY, clearWidth, clearHeight);
+
+    // 重新绘制图片（需要重新应用滤镜）
+    const imgWidth = imageRef.current.width;
+    const imgHeight = imageRef.current.height;
+
+    let rotatedWidth = imgWidth;
+    let rotatedHeight = imgHeight;
+    if (editState.rotateDegree % 180 !== 0) {
+      rotatedWidth = imgHeight;
+      rotatedHeight = imgWidth;
+    }
+
+    const newOffsetX = (canvasRef.current!.width / (window.devicePixelRatio || 1) - rotatedWidth * scale) / 2;
+    const newOffsetY = (canvasRef.current!.height / (window.devicePixelRatio || 1) - rotatedHeight * scale) / 2;
+
+    ctx.translate(newOffsetX + (rotatedWidth * scale) / 2, newOffsetY + (rotatedHeight * scale) / 2);
+    ctx.rotate((editState.rotateDegree * Math.PI) / 180);
+    ctx.translate(-(imgWidth * scale) / 2, -(imgHeight * scale) / 2);
+
+    applyFilter(ctx, imageRef.current, scale, editState.filterParams);
+    ctx.restore();
+
+    // 绘制裁剪框
+    if (editState.activeTab === 'crop') {
+      const currentBoxX = offsetX + currentBox.x * scale;
+      const currentBoxY = offsetY + currentBox.y * scale;
+      const currentBoxWidth = currentBox.width * scale;
+      const currentBoxHeight = currentBox.height * scale;
+
+      drawCropBox(ctx, offsetX, offsetY, scale, currentBox);
+    }
+  }, [editState.rotateDegree, editState.filterParams, editState.cropScale, editState.activeTab]);
+
+  // 自动保存：监听编辑状态变化，触发自动保存（防抖1秒）
+  useEffect(() => {
+    // 忽略初始加载和不需要保存的状态
+    if (!imageUrl || !imageRef.current?.complete) return;
+
+    // 排除不需要保存的字段
+    const { saveModalVisible, editedImageBase64, imageVersion, ...stateToSave } = editState as any;
+
+    autoSaveImageEdit(imageUrl, stateToSave);
+  }, [imageUrl, editState.activeTab, editState.cropRatio, editState.cropScale, editState.cropBox, editState.currentFilterPreset, editState.filterParams, editState.rotateDegree, editState.isRemoveWhiteEdge]);
 
   // 鼠标事件处理
   useEffect(() => {
@@ -287,6 +417,27 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
       }
 
       if (dragType) {
+        // 性能优化：保存 Canvas 上下文用于局部重绘
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          dragRef.current.canvasCtx = ctx;
+          dragRef.current.canvasDpr = window.devicePixelRatio || 1;
+          const scale = editState.cropScale;
+          const imgWidth = imageRef.current.width;
+          const imgHeight = imageRef.current.height;
+          let rotatedWidth = imgWidth;
+          let rotatedHeight = imgHeight;
+          if (editState.rotateDegree % 180 !== 0) {
+            rotatedWidth = imgHeight;
+            rotatedHeight = imgWidth;
+          }
+          const displayWidth = canvas.width / dragRef.current.canvasDpr;
+          const displayHeight = canvas.height / dragRef.current.canvasDpr;
+          dragRef.current.canvasOffsetX = (displayWidth - rotatedWidth * scale) / 2;
+          dragRef.current.canvasOffsetY = (displayHeight - rotatedHeight * scale) / 2;
+          // 保存初始裁剪框位置用于局部重绘
+          dragRef.current.lastCropBox = { ...cropBox };
+        }
         dragRef.current.isDragging = true;
         dragRef.current.dragType = dragType;
         dragRef.current.dragStart = { x: mouseX, y: mouseY };
@@ -298,8 +449,8 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
       const canvas = canvasRef.current!;
       const mouseX = e.offsetX;
       const mouseY = e.offsetY;
-      
-      // 当不处于拖动状态时，检测鼠标悬停位置并设置光标
+
+      // 性能优化：非拖动时的光标检测需要实时响应，放在 requestAnimationFrame 外面
       if (!dragRef.current.isDragging && editState.activeTab === 'crop') {
         const cropBox = editState.cropBox;
         const scale = editState.cropScale;
@@ -366,9 +517,18 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
         canvas.style.cursor = cursor;
       }
       
+      // 性能优化：拖动处理使用 requestAnimationFrame 节流，避免高频重绘导致卡顿
       if (!dragRef.current.isDragging || editState.activeTab !== 'crop') return;
-      
-      const dx = mouseX - dragRef.current.dragStart.x;
+
+      // 如果已有待执行的动画帧，跳过这次处理
+      if (dragRef.current.rafId !== null) {
+        return;
+      }
+
+      dragRef.current.rafId = requestAnimationFrame(() => {
+        dragRef.current.rafId = null;
+
+        const dx = mouseX - dragRef.current.dragStart.x;
       const dy = mouseY - dragRef.current.dragStart.y;
       const scale = editState.cropScale;
       const currentBox = { ...dragRef.current.cropBox };
@@ -489,12 +649,87 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
         ...prev,
         cropBox: currentBox
       }));
-      
+
+      // 性能优化：局部重绘（仅重绘变化区域，而非整个画布）
+      if (dragRef.current.canvasCtx && dragRef.current.lastCropBox) {
+        const ctx = dragRef.current.canvasCtx;
+        const scale = editState.cropScale;
+        const offsetX = dragRef.current.canvasOffsetX;
+        const offsetY = dragRef.current.canvasOffsetY;
+
+        // 计算需要重绘的区域（包含新旧位置）
+        const prevBox = dragRef.current.lastCropBox;
+        const minX = Math.min(prevBox.x, currentBox.x) - 1;
+        const minY = Math.min(prevBox.y, currentBox.y) - 1;
+        const maxX = Math.max(prevBox.x + prevBox.width, currentBox.x + currentBox.width) + 1;
+        const maxY = Math.max(prevBox.y + prevBox.height, currentBox.y + currentBox.height) + 1;
+
+        const dpr = dragRef.current.canvasDpr;
+        const clearX = (offsetX + minX * scale) * dpr;
+        const clearY = (offsetY + minY * scale) * dpr;
+        const clearWidth = (maxX - minX) * scale * dpr;
+        const clearHeight = (maxY - minY) * scale * dpr;
+
+        // 清除重绘区域
+        ctx.save();
+        ctx.clearRect(clearX, clearY, clearWidth, clearHeight);
+
+        // 重新绘制图片（需要重新应用滤镜）
+        const imgWidth = imageRef.current.width;
+        const imgHeight = imageRef.current.height;
+
+        let rotatedWidth = imgWidth;
+        let rotatedHeight = imgHeight;
+        if (editState.rotateDegree % 180 !== 0) {
+          rotatedWidth = imgHeight;
+          rotatedHeight = imgWidth;
+        }
+
+        const canvasWidth = canvasRef.current!.width / dpr;
+        const canvasHeight = canvasRef.current!.height / dpr;
+        const newOffsetX = (canvasWidth - rotatedWidth * scale) / 2;
+        const newOffsetY = (canvasHeight - rotatedHeight * scale) / 2;
+
+        ctx.translate(newOffsetX + (rotatedWidth * scale) / 2, newOffsetY + (rotatedHeight * scale) / 2);
+        ctx.rotate((editState.rotateDegree * Math.PI) / 180);
+        ctx.translate(-(imgWidth * scale) / 2, -(imgHeight * scale) / 2);
+
+        applyFilter(ctx, imageRef.current, scale, editState.filterParams);
+        ctx.restore();
+
+        // 绘制裁剪框
+        const currentBoxX = offsetX + currentBox.x * scale;
+        const currentBoxY = offsetY + currentBox.y * scale;
+        const currentBoxWidth = currentBox.width * scale;
+        const currentBoxHeight = currentBox.height * scale;
+
+        // 裁剪框遮罩
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, currentBoxX * dpr, canvasRef.current!.height);
+        ctx.fillRect((currentBoxX + currentBoxWidth) * dpr, 0, canvasRef.current!.width - (currentBoxX + currentBoxWidth) * dpr, canvasRef.current!.height);
+        ctx.fillRect(currentBoxX * dpr, 0, currentBoxWidth * dpr, currentBoxY * dpr);
+        ctx.fillRect(currentBoxX * dpr, (currentBoxY + currentBoxHeight) * dpr, currentBoxWidth * dpr, canvasRef.current!.height - (currentBoxY + currentBoxHeight) * dpr);
+
+        // 裁剪框边框
+        ctx.strokeStyle = '#4096ff';
+        ctx.lineWidth = 2 * dpr;
+        ctx.strokeRect(currentBoxX * dpr, currentBoxY * dpr, currentBoxWidth * dpr, currentBoxHeight * dpr);
+
+        // 更新上一次的位置
+        dragRef.current.lastCropBox = { ...currentBox };
+      }
+
       dragRef.current.cropBox = currentBox;
       dragRef.current.dragStart = { x: mouseX, y: mouseY };
+      }); // 关闭 requestAnimationFrame 回调
     };
 
     const handleMouseUp = () => {
+      // 性能优化：清除待执行的动画帧
+      if (dragRef.current.rafId !== null) {
+        cancelAnimationFrame(dragRef.current.rafId);
+        dragRef.current.rafId = null;
+      }
       dragRef.current.isDragging = false;
       dragRef.current.dragType = null;
     };
@@ -507,6 +742,11 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
     });
 
     return () => {
+      // 性能优化：组件卸载时清除所有待执行的动画帧，防止内存泄漏
+      if (dragRef.current.rafId !== null) {
+        cancelAnimationFrame(dragRef.current.rafId);
+        dragRef.current.rafId = null;
+      }
       canvas.removeEventListener('mousedown', handleMouseDown);
       canvas.removeEventListener('mouseleave', () => {
         canvas.style.cursor = 'default';
@@ -573,14 +813,15 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
     ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width * scale, tempCanvas.height * scale);
   };
 
-    // 绘制裁剪框（含调整控制点）
+    // 绘制裁剪框（含调整控制点）- 支持传入自定义裁剪框
     const drawCropBox = (
         ctx: CanvasRenderingContext2D,
         offsetX: number,
         offsetY: number,
-        scale: number
+        scale: number,
+        customBox?: { x: number; y: number; width: number; height: number }
     ) => {
-        const cropBox = editState.cropBox;
+        const cropBox = customBox || editState.cropBox;
         let boxX = offsetX + cropBox.x * scale;
         let boxY = offsetY + cropBox.y * scale;
         let boxWidth = cropBox.width * scale;
@@ -1005,11 +1246,33 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
         )}
       </div>
 
+  // 撤销操作
+  const handleUndo = useCallback(() => {
+    const prevState = undoImageEdit();
+    if (prevState) {
+      setEditState(prev => ({
+        ...prev,
+        ...prevState,
+      }));
+    }
+  }, []);
+
+  // 重做操作
+  const handleRedo = useCallback(() => {
+    const nextState = redoImageEdit();
+    if (nextState) {
+      setEditState(prev => ({
+        ...prev,
+        ...nextState,
+      }));
+    }
+  }, []);
+
       <div className="edit-main">
         <div className="top-toolbar">
           <span className="toolbar-title">编辑图片</span>
-          <button className="toolbar-btn" title="撤销"><UndoIcon /></button>
-          <button className="toolbar-btn" title="重做"><RedoIcon /></button>
+          <button className="toolbar-btn" title="撤销" onClick={handleUndo}><UndoIcon /></button>
+          <button className="toolbar-btn" title="重做" onClick={handleRedo}><RedoIcon /></button>
           <button className="toolbar-btn" title="旋转" onClick={handleRotate}><RotateRightIcon /></button>
           <button className="toolbar-btn close-btn" title="关闭" onClick={onCancel}><CloseIcon /></button>
           <button className="toolbar-btn confirm-btn" title="确认" onClick={handleConfirm}><Check /></button>

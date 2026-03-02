@@ -1,9 +1,11 @@
-import { withGroup } from '@plait/common';
-import { PlaitElement, PlaitPlugin } from '@plait/core';
+import { PlaitElement, PlaitPlugin, PlaitBoard } from '@plait/core';
 import { withDraw } from '@plait/draw';
 import { withCommonPlugin } from '../../plugins/with-common';
 import { Board, Wrapper } from '@plait-board/react-board';
 import { MindThemeColors, withMind } from '@plait/mind';
+
+// 创建一个空的 withGroup 插件来完全禁用 group 功能
+const withGroup = (board: PlaitBoard): PlaitBoard => board;
 
 const ErrorComp = ({ error }: { error: string }) => {
   return (

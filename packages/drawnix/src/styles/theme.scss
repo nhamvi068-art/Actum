@@ -5,9 +5,9 @@
   --focus-highlight-color: #{$oc-blue-2};
   --icon-fill-color: var(--color-on-surface);
   --island-bg-color: #ffffff;
-  --island-border-color: #eeeeee;
+  --island-border-color: #e5e7eb;
   --keybinding-color: var(--color-gray-40);
-  --shadow-island: 0 0 16px #00000014;
+  --shadow-island: 0 8px 20px -6px rgba(15, 23, 42, 0.15);
   --dialog-border-color: var(--color-gray-20);
   --button-hover-bg: var(--color-surface-high);
   --button-active-border: var(--color-brand-active);
@@ -63,7 +63,7 @@
   --color-success-lighter: #cafccc;
 
   --border-radius-sm: 0.25rem;
-  --border-radius-md: 0.375rem;
+  --border-radius-md: 0.75rem;
   --border-radius-lg: 0.5rem;
   --color-surface-high: hsl(220, 100%, 97%);
   --color-surface-mid: hsl(220 25% 96%);

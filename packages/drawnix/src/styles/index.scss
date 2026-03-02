@@ -9,6 +9,7 @@
         position: absolute;
         top: 82px;
         left: 0;
+        background-color: #ffffff;
         .tool-icon__icon {
             width: auto;
             padding: 0 8px;
@@ -21,46 +22,109 @@
         top: 36px;
         left: 50%;
         transform: translateX(-50%);
+        border-radius: 40px; /* Capsule shape */
+        overflow: visible; /* Allow shadow/border to be visible */
+        background-color: #ffffff;
+        box-shadow: var(--shadow-island);
+        padding: 4px 6px;
         @include isMobile {
             top: 20px;
+        }
+
+        /* Selected item style */
+        .tool-icon--selected,
+        .tool-icon_type_button.tool-icon--selected,
+        .tool-icon:has(.tool-icon_type_radio:checked),
+        .tool-icon:has(.tool-icon_type_checkbox:checked) {
+            border-radius: 50% !important;
+            background-color: var(--color-surface-primary-container) !important;
+            
+            .tool-icon__icon {
+                border-radius: 50%;
+            }
+        }
+
+        /* Hover item style */
+        .tool-icon__icon:hover {
+            border-radius: 50%;
+            background-color: var(--color-surface-hover, rgba(0, 0, 0, 0.05)); /* Use theme variable if available */
         }
     }
     .zoom-toolbar {
         cursor: default;
         position: absolute;
-        top: 36px;
+        bottom: 20px;
         right: 36px;
         @include isMobile {
             display: none;
         }
-        .zoom-out-button {
-            border-top-right-radius: 0 !important;
-            border-bottom-right-radius: 0 !important;
+        
+        /* 整体胶囊形状 */
+        background-color: #ffffff;
+        border-radius: 46px; /* 高度的一半，实现胶囊形状 */
+        height: 36px;
+        padding: 4px;
+        display: inline-flex;
+        align-items: center;
+        
+        /* 内部元素样式 */
+        .zoom-out-button, .zoom-in-button {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: transparent;
+            color: var(--color-on-surface);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            
+            &:hover {
+                background-color: var(--color-surface-primary-container);
+            }
+            
+            &:focus {
+                outline: none;
+            }
         }
+
         .zoom-menu-trigger {
-            width: 56px;;
+            min-width: 40px;
+            height: 28px;
+            padding: 0 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--color-on-surface);
-            border-radius: var(--border-radius-sm);;
+            border-radius: 14px;
             cursor: pointer;
+            background-color: transparent;
+            font-size: 12px;
+            font-weight: 500;
 
             &:hover, &.active {
-                --background: var(--color-surface-primary-container);
-                background-color: var(--background);
+                background-color: var(--color-surface-primary-container);
+            }
+            
+            &:focus {
+                outline: none;
             }
         }
-        .zoom-in-button{
-            color: var(--color-on-surface);
-            border-top-left-radius: 0 !important;
-            border-bottom-left-radius: 0 !important;
+
+        .stack {
+            display: flex;
+            align-items: center;
+            gap: 0;
         }
     }
     .app-toolbar {
         position: absolute;
-        top: 36px;
-        left: 36px;
+        top: 20px;
+        left: 20px;
         @include isMobile {
             bottom: 20px;
             top: auto;
@@ -147,6 +211,23 @@
 }
 
 .plait-board-container {
+    overflow: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        display: none;
+    }
+
+    &::-webkit-scrollbar-track {
+        display: none;
+    }
+
     &.pointer-eraser {
         .board-host-svg {
             cursor: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNjY2IiBzdHJva2Utd2lkdGg9IjEuNSIvPgo8L3N2Zz4=') 10 10, crosshair !important;
@@ -154,6 +235,24 @@
     }
     .slate-editable-container {
         cursor: inherit !important;
+    }
+
+    .viewport-container {
+        overflow: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            display: none;
+        }
+
+        &::-webkit-scrollbar-track {
+            display: none;
+        }
     }
 }
 
@@ -182,31 +281,62 @@
     }
 }
 
-// 流光动画 - 占位符加载效果
-@keyframes shimmer1 {
-    0% { background-position: 100% 0; }
-    100% { background-position: -100% 0; }
-}
-
-@keyframes shimmer2 {
-    0% { background-position: -100% 0; }
-    100% { background-position: 100% 0; }
-}
-
-@keyframes shimmer3 {
-    0% { background-position: 50% 0; }
-    100% { background-position: -50% 0; }
+// 经典斜向扫光动画 - 占位符加载效果
+@keyframes shimmer-classic {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 .placeholder-shimmer {
-    &-1 {
-        animation: shimmer1 3s linear infinite;
+    animation: shimmer-classic 2s linear infinite;
+}
+
+// 渐变脉冲动画 - 占位符加载效果（优化版本，使用 GPU 加速）
+// 简化为只使用 transform 和 opacity，避免重绘
+@keyframes placeholder-glow {
+    0%, 100% { 
+        opacity: 0.6;
+        transform: scale(1);
     }
-    &-2 {
-        animation: shimmer2 2.5s linear infinite;
+    50% { 
+        opacity: 1;
+        transform: scale(1.02);
     }
-    &-3 {
-        animation: shimmer3 2s linear infinite;
+}
+
+// 轻量级脉冲动画 - 只使用 GPU 加速属性
+@keyframes placeholder-pulse {
+    0%, 100% {
+        opacity: 0.7;
     }
+    50% {
+        opacity: 1;
+    }
+}
+
+// 高效的扫光动画 - 使用 background-position (GPU 加速)
+@keyframes shimmer-efficient {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.placeholder-gradient {
+    // 使用静态渐变，避免动画导致的重绘
+    // 只在生成状态时显示轻微动画，否则使用静态效果
+    background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 50%, #a5b4fc 100%);
+    // 使用 transform: scale 实现脉冲效果 (GPU 加速)
+    animation: placeholder-pulse 3s ease-in-out infinite;
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    // 禁用子元素的 pointer events
+    pointer-events: none;
 }
 

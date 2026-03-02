@@ -1,4 +1,11 @@
 import { useState, useEffect } from 'react';
+import {
+  checkStorageQuota,
+  getStorageStatusText,
+  clearThumbnails,
+  cleanOldBoardContent,
+  formatBytes,
+} from '../../app/utils/storage';
 
 export interface ApiConfig {
   apiKey: string;
@@ -10,22 +17,32 @@ interface ApiConfigModalProps {
   onClose: () => void;
   config: ApiConfig;
   onSave: (config: ApiConfig) => void;
+  onClearCache?: () => void;
 }
 
 type ValidationStatus = 'idle' | 'validating' | 'success' | 'error';
 
-export function ApiConfigModal({ isOpen, onClose, config, onSave }: ApiConfigModalProps) {
+export function ApiConfigModal({ isOpen, onClose, config, onSave, onClearCache }: ApiConfigModalProps) {
   const [apiKey, setApiKey] = useState(config.apiKey);
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
   const [showApiKey, setShowApiKey] = useState(false);
   const [validationStatus, setValidationStatus] = useState<ValidationStatus>('idle');
   const [validationMessage, setValidationMessage] = useState('');
+  const [storageInfo, setStorageInfo] = useState<{ used: number; quota: number; percentage: number } | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     setApiKey(config.apiKey);
     setBaseUrl(config.baseUrl);
     setValidationStatus('idle');
     setValidationMessage('');
+    
+    // 加载存储配额信息
+    if (isOpen) {
+      checkStorageQuota().then(quota => {
+        setStorageInfo(quota);
+      });
+    }
   }, [config, isOpen]);
 
   if (!isOpen) return null;
@@ -86,6 +103,42 @@ export function ApiConfigModal({ isOpen, onClose, config, onSave }: ApiConfigMod
     if (e.target === e.currentTarget) {
       onClose();
     }
+  };
+
+  const handleClearCache = async () => {
+    if (!confirm('确定要清理本地缓存吗？这将删除所有缩略图和旧项目数据。')) {
+      return;
+    }
+    
+    setIsClearing(true);
+    try {
+      await clearThumbnails();
+      await cleanOldBoardContent(3);
+      
+      // 刷新存储信息
+      const quota = await checkStorageQuota();
+      setStorageInfo(quota);
+      
+      // 通知父组件刷新数据
+      if (onClearCache) {
+        onClearCache();
+      }
+      
+      alert('缓存清理完成！');
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+      alert('清理缓存失败，请重试');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  // 计算存储使用量显示
+  const getStorageUsageColor = () => {
+    if (!storageInfo) return '';
+    if (storageInfo.percentage > 90) return 'storage-critical';
+    if (storageInfo.percentage > 70) return 'storage-warning';
+    return 'storage-normal';
   };
 
   return (
@@ -167,6 +220,39 @@ export function ApiConfigModal({ isOpen, onClose, config, onSave }: ApiConfigMod
               <span>{validationMessage}</span>
             </div>
           )}
+
+          {/* 存储管理部分 */}
+          <div className="storage-section">
+            <h3 className="storage-title">本地存储</h3>
+            {storageInfo ? (
+              <>
+                <div className="storage-bar-container">
+                  <div 
+                    className={`storage-bar ${getStorageUsageColor()}`}
+                    style={{ width: `${Math.min(storageInfo.percentage, 100)}%` }}
+                  />
+                </div>
+                <p className="storage-info">
+                  已使用: {formatBytes(storageInfo.used)} / {formatBytes(storageInfo.quota)}
+                  ({storageInfo.percentage.toFixed(1)}%)
+                </p>
+                {storageInfo.percentage > 80 && (
+                  <p className="storage-warning">
+                    存储空间不足，建议清理缓存
+                  </p>
+                )}
+                <button
+                  className="btn-clear-cache"
+                  onClick={handleClearCache}
+                  disabled={isClearing}
+                >
+                  {isClearing ? '清理中...' : '清理缓存'}
+                </button>
+              </>
+            ) : (
+              <p className="storage-loading">加载中...</p>
+            )}
+          </div>
         </div>
 
         <div className="api-config-footer">

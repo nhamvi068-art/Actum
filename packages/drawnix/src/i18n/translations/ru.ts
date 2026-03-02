@@ -85,6 +85,7 @@ const ruTranslations: Translations = {
   'menu.exportImage.png': 'PNG',
   'menu.exportImage.jpg': 'JPG',
   'menu.cleanBoard': 'Очистить доску',
+  'menu.rename': 'Переименовать',
   'menu.github': 'GitHub',
   
   // Dialog translations
@@ -174,9 +175,9 @@ const ruTranslations: Translations = {
   'mind.centralText': 'Центральная тема',
   'mind.abstractNodeText': 'Резюме',
   
-  'tutorial.title': 'Drawnix',
+  'tutorial.title': 'Actum',
   'tutorial.description':
-    'Универсальная доска: майнд-карты, блок-схемы, свободное рисование и многое другое',
+    'Универсальная доска, упрощающая дизайн',
   'tutorial.dataDescription': 'Все данные хранятся локально в вашем браузере',
   'tutorial.appToolbar': 'Экспорт, настройки языка, ...',
   'tutorial.creationToolbar': 'Выберите инструмент, чтобы начать творить',

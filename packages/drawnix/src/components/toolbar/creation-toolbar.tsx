@@ -4,7 +4,6 @@ import Stack from '../stack';
 import { ToolButton } from '../tool-button';
 import {
   HandIcon,
-  MindIcon,
   SelectionIcon,
   ShapeIcon,
   TextIcon,
@@ -21,7 +20,6 @@ import {
   PlaitBoard,
   PlaitPointerType,
 } from '@plait/core';
-import { MindPointerType } from '@plait/mind';
 import { BoardCreationMode, setCreationMode } from '@plait/common';
 import {
   ArrowLineShape,
@@ -78,11 +76,6 @@ export const BUTTONS: AppToolButtonProps[] = [
     titleKey: 'toolbar.selection',
   },
   {
-    icon: MindIcon,
-    pointer: MindPointerType.mind,
-    titleKey: 'toolbar.mind',
-  },
-  {
     icon: TextIcon,
     pointer: BasicShapes.text,
     titleKey: 'toolbar.text',
@@ -94,16 +87,16 @@ export const BUTTONS: AppToolButtonProps[] = [
     key: PopupKey.freehand,
   },
   {
-    icon: StraightArrowLineIcon,
-    titleKey: 'toolbar.arrow',
-    key: PopupKey.arrow,
-    pointer: ArrowLineShape.straight,
-  },
-  {
     icon: ShapeIcon,
     titleKey: 'toolbar.shape',
     key: PopupKey.shape,
     pointer: BasicShapes.rectangle,
+  },
+  {
+    icon: StraightArrowLineIcon,
+    titleKey: 'toolbar.arrow',
+    key: PopupKey.arrow,
+    pointer: ArrowLineShape.straight,
   },
   {
     icon: ImageIcon,
@@ -174,8 +167,16 @@ export const CreationToolbar = () => {
     <Island
       padding={1}
       className={classNames('draw-toolbar', ATTACHED_ELEMENT_CLASS_NAME)}
+      style={{
+        position: 'absolute',
+        left: '20px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: 100,
+        borderRadius: '40px',
+      }}
     >
-      <Stack.Row gap={1}>
+      <Stack.Col gap={1}>
         {BUTTONS.map((button, index) => {
           if (appState.isMobile && button.pointer === PlaitPointerType.hand) {
             return <></>;
@@ -186,6 +187,7 @@ export const CreationToolbar = () => {
                 key={index}
                 open={freehandOpen || checkCurrentPointerIsFreehand(board)}
                 sideOffset={12}
+                placement="right-start"
                 onOpenChange={(open) => {
                   setFreehandOpen(open);
                 }}
@@ -229,6 +231,7 @@ export const CreationToolbar = () => {
                 key={index}
                 open={shapeOpen}
                 sideOffset={12}
+                placement="right-start"
                 onOpenChange={(open) => {
                   setShapeOpen(open);
                 }}
@@ -275,6 +278,7 @@ title={button.titleKey ? t(button.titleKey as any) : 'Shape'}
                 key={index}
                 open={arrowOpen}
                 sideOffset={12}
+                placement="right-start"
                 onOpenChange={(open) => {
                   setArrowOpen(open);
                 }}
@@ -341,7 +345,7 @@ title={button.titleKey ? t(button.titleKey as any) : 'Shape'}
             />
           );
         })}
-      </Stack.Row>
+      </Stack.Col>
     </Island>
   );
 };

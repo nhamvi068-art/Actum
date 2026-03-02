@@ -1,7 +1,20 @@
 .popup-toolbar {
+    .tool-icon.tool-icon--selected,
+    .property-button.tool-icon--selected {
+        border-radius: 50% !important;
+        background-color: var(--color-surface-primary-container) !important;
+    }
+    
     .property-button {
         height: var(--lg-button-size);
         width: var(--lg-button-size);
+        
+        /* 悬停状态为圆形 */
+        &:hover {
+            border-radius: 50%;
+            background-color: var(--color-surface-hover, rgba(0, 0, 0, 0.05));
+        }
+        
         .color-label {
             cursor: pointer;
         }
@@ -70,4 +83,273 @@
   background-color: #fff;
   border-radius: 8px;
   padding: 20px;
+}
+
+/* 尺寸菜单项样式 */
+.size-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  min-width: 70px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #f0f0f0;
+  }
+
+  .size-menu-item-name {
+    font-size: 11px;
+    color: #333;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .size-menu-item-spec {
+    font-size: 9px;
+    color: #999;
+    white-space: nowrap;
+  }
+}
+
+/* 自定义尺寸输入框样式 */
+.custom-size-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .size-input-wrapper {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0 6px;
+    height: 26px;
+    line-height: 1;
+
+    &:focus-within {
+      border-color: #ff7d00;
+    }
+
+    .size-input-label {
+      font-size: 11px;
+      color: #999;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .custom-size-input {
+      width: 56px;
+      border: none;
+      padding: 0;
+      margin-left: 2px;
+      font-size: 13px;
+      text-align: right;
+      outline: none;
+
+      &::-webkit-outer-spin-button,
+      &::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+    }
+  }
+
+  .aspect-lock-button {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    color: #999;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      background-color: #f0f0f0;
+      color: #666;
+    }
+
+    &.locked {
+      color: #ff7d00;
+
+      &:hover {
+        color: #e06e00;
+      }
+    }
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+/* 尺寸下拉菜单样式 */
+.size-dropdown-container {
+  position: relative;
+
+  .size-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: transparent;
+    font-size: 12px;
+    color: #333;
+    white-space: nowrap;
+    min-width: unset;
+    height: 26px;
+    line-height: 1;
+
+    &:hover {
+      background-color: #f0f0f0;
+    }
+
+    .size-dropdown-arrow {
+      font-size: 8px;
+      color: #999;
+    }
+  }
+
+  .size-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    min-width: 160px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1001;
+
+    .size-dropdown-category {
+      padding: 6px 12px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #999;
+      background-color: #f9f9f9;
+      border-bottom: 1px solid #eee;
+
+      &:not(:first-child) {
+        border-top: 1px solid #eee;
+      }
+    }
+
+    .size-dropdown-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: #f5f5f5;
+      }
+
+      .size-dropdown-item-name {
+        font-size: 12px;
+        color: #333;
+      }
+
+      .size-dropdown-item-spec {
+        font-size: 11px;
+        color: #999;
+      }
+    }
+  }
+}
+
+/* 文本样式按钮样式 */
+.popup-font-size-edit {
+  .font-size-input {
+    width: 50px;
+    height: 22px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 12px;
+    text-align: center;
+    outline: none;
+
+    &:focus {
+      border-color: #ff7d00;
+    }
+  }
+}
+
+.popup-font-family-container {
+  position: relative;
+
+  .popup-font-family-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    min-width: 60px;
+
+    .font-family-label {
+      max-width: 60px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dropdown-arrow {
+      font-size: 8px;
+      color: #999;
+    }
+  }
+
+  .popup-font-family-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    min-width: 120px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1001;
+
+    .font-family-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      font-size: 13px;
+
+      &:hover {
+        background-color: #f5f5f5;
+      }
+
+      &.selected {
+        background-color: #fff5e6;
+        color: #ff7d00;
+      }
+    }
+  }
+}
+
+.popup-bold-btn {
+  font-weight: bold !important;
+  font-size: 14px !important;
+
+  &.active {
+    background-color: #fff5e6;
+    color: #ff7d00;
+  }
 }

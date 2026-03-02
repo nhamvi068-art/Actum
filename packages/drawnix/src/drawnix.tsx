@@ -20,15 +20,97 @@ import {
   Transforms,
 } from '@plait/core';
 import React, { useState, useRef, useEffect } from 'react';
-import { withGroup } from '@plait/common';
 import { withDraw, PlaitDrawElement, DrawTransforms } from '@plait/draw';
 import { MindThemeColors, withMind } from '@plait/mind';
 import MobileDetect from 'mobile-detect';
 import { withMindExtend } from './plugins/with-mind-extend';
+import { clearCircularGroupReferences } from './plugins/with-common';
+
+// 创建一个空的 withGroup 插件来完全禁用 group 功能
+// 这样可以彻底解决智能拆图后删除图片的栈溢出问题
+const withGroup = (board: PlaitBoard): PlaitBoard => {
+  // 禁用 group 功能，什么都不做
+  return board;
+};
+
+// 创建安全的 getGroupByElement 函数
+const createSafeGetGroupByElement = (originalFn: Function) => {
+  return function(board: PlaitBoard, element: any, recursion?: boolean, originElements?: any[]) {
+    // 安全检查：如果没有元素或没有 groupId，直接返回
+    if (!element || !element.groupId) {
+      return recursion ? [] : null;
+    }
+    
+    // 使用 Set 来跟踪已访问的元素，防止循环引用
+    const visited = new Set<string>();
+    
+    const findGroup = (el: any, recurse: boolean, originEls?: any[]): any => {
+      if (!el || !el.groupId) {
+        return recurse ? [] : null;
+      }
+      
+      // 检测循环：如果已经访问过这个元素，停止递归
+      if (visited.has(el.id)) {
+        console.warn('检测到循环引用，停止递归:', el.id);
+        return recurse ? [] : null;
+      }
+      
+      visited.add(el.id);
+      
+      const elements = originEls || board.children;
+      const group = elements.find((item: any) => item.id === el.groupId);
+      
+      if (!group) {
+        return recurse ? [] : null;
+      }
+      
+      if (recurse) {
+        const groups = [group];
+        const grandGroups = findGroup(group, recurse, originEls);
+        if (grandGroups && Array.isArray(grandGroups) && grandGroups.length) {
+          groups.push(...grandGroups);
+        }
+        return groups;
+      } else {
+        return group;
+      }
+    };
+    
+    return findGroup(element, recursion || false, originElements);
+  };
+};
+
+// 创建一个插件，在 withGroup 之前清除所有 groupId
+// 这样可以防止循环引用导致的栈溢出问题
+const withClearGroupIds = (board: PlaitBoard): PlaitBoard => {
+  // 清除所有元素的 groupId 和相关属性
+  for (const element of board.children) {
+    if ('groupId' in element) {
+      (element as any).groupId = undefined;
+    }
+    // 清除 groupIds 数组（如果有）
+    if ('groupIds' in element) {
+      (element as any).groupIds = undefined;
+    }
+  }
+  
+  // 同时清除 board 上可能缓存的 group 信息
+  // 这样可以确保不会有任何残留的 group 引用
+  if ((board as any).groups) {
+    (board as any).groups = undefined;
+  }
+  if ((board as any).groupCache) {
+    (board as any).groupCache = undefined;
+  }
+  
+  return board;
+};
+
 import { withCommonPlugin } from './plugins/with-common';
 import { CreationToolbar } from './components/toolbar/creation-toolbar';
 import { ZoomToolbar } from './components/toolbar/zoom-toolbar';
 import { PopupToolbar } from './components/toolbar/popup-toolbar/popup-toolbar';
+import { SelectionToolbar } from './components/toolbar/selection-toolbar/selection-toolbar';
 import { AppToolbar } from './components/toolbar/app-toolbar/app-toolbar';
 import classNames from 'classnames';
 import './styles/index.scss';
@@ -134,11 +216,22 @@ export type DrawnixProps = {
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
   onBack?: () => void;
+  showMenuButton?: boolean;
   // 图片生成相关
   onGenerateImage?: (prompt: string, images: string[], options: ImageGenerateOptions) => void;
   onImageGenerated?: (imageUrl: string, placeholderId: string) => void;
   imageGenerateOptions?: ImageGenerateOptions;
   isGenerating?: boolean;
+  // 任务恢复相关
+  initialPlaceholder?: PlaceholderInfo;
+  onPlaceholderUpdate?: (placeholderInfo: PlaceholderInfo) => void;
+  // 任务列表相关
+  projectId?: string;
+  tasks?: any[];
+  onTaskRetry?: (task: any) => void;
+  onTaskClick?: (task: any) => void;
+  onTaskRetry?: (task: any) => void;
+  onTaskClick?: (task: any) => void;
 } & React.HTMLAttributes<HTMLDivElement>;
 
 // 占位块信息接口
@@ -334,29 +427,35 @@ const isPositionOccupied = (
 // 生成唯一ID
 const generatePlaceholderId = () => `placeholder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-// 加载动画覆盖层组件 - 只用一个占位符显示位置和动画效果
-const PlaceholderOverlay: React.FC<{
+// PlaceholderOverlay 组件的 props 类型
+interface PlaceholderOverlayProps {
   placeholder: PlaceholderInfo;
-  board: PlaitBoard;
+  board: DrawnixBoard;
+  viewportZoom: number;
+  viewportOrigX: number;
+  viewportOrigY: number;
   onPlaceholderMove?: (x: number, y: number) => void;
-}> = ({ placeholder, board, onPlaceholderMove }) => {
-  // 直接使用 placeholderInfo 中的位置信息
+}
+
+// 加载动画覆盖层组件 - 优化版本，使用独立的视口属性避免不必要的重渲染
+const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({ placeholder, board, viewportZoom, viewportOrigX, viewportOrigY, onPlaceholderMove }) => {
   const elementX = placeholder.x;
   const elementY = placeholder.y;
   const elementWidth = placeholder.width;
   const elementHeight = placeholder.height;
-  
-  // 使用与插入图片相同的坐标计算
-  const viewport = board.viewport;
-  const zoom = viewport.zoom || 1;
-  const origX = viewport.origination?.[0] || 0;
-  const origY = viewport.origination?.[1] || 0;
-  
-  // 计算相对于视口的屏幕位置
-  const left = (elementX - origX) * zoom;
-  const top = (elementY - origY) * zoom;
-  const width = elementWidth * zoom;
-  const height = elementHeight * zoom;
+
+  // 使用 useMemo 缓存视口计算结果，只依赖具体的数值而不是整个对象
+  const screenPosition = React.useMemo(() => {
+    const zoom = viewportZoom || 1;
+
+    return {
+      left: (elementX - viewportOrigX) * zoom,
+      top: (elementY - viewportOrigY) * zoom,
+      width: elementWidth * zoom,
+      height: elementHeight * zoom,
+      zoom,
+    };
+  }, [viewportZoom, viewportOrigX, viewportOrigY, elementX, elementY, elementWidth, elementHeight]);
   
   // 创建一个临时的虚拟 geometry 元素用于移动对齐
   const createMovingElement = (x: number, y: number): PlaitElement => {
@@ -480,10 +579,10 @@ const PlaceholderOverlay: React.FC<{
         className="image-placeholder"
         style={{
           position: 'absolute',
-          left: left,
-          top: top,
-          width: width,
-          height: height,
+          left: screenPosition.left,
+          top: screenPosition.top,
+          width: screenPosition.width,
+          height: screenPosition.height,
           overflow: 'hidden',
           pointerEvents: 'auto',
           cursor: 'grab',
@@ -492,40 +591,21 @@ const PlaceholderOverlay: React.FC<{
         }}
         onPointerDown={handlePointerDown}
       >
-      {/* 多层流光效果 */}
+      {/* 渐变背景动画效果 */}
       <div
-        className="placeholder-shimmer-1"
+        className="placeholder-gradient"
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(90deg, #667eea, #764ba2, #f093fb, #667eea)',
-          backgroundSize: '200% 100%',
-        }}
-      />
-      <div
-        className="placeholder-shimmer-2"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(90deg, #f093fb, #667eea, #764ba2, #f093fb)',
-          backgroundSize: '200% 100%',
-          opacity: 0.7,
-        }}
-      />
-      <div
-        className="placeholder-shimmer-3"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(90deg, #764ba2, #f093fb, #667eea, #764ba2)',
-          backgroundSize: '200% 100%',
-          opacity: 0.5,
         }}
       />
     </div>
     </>
   );
 };
+
+// 使用 React.memo 包装组件，避免不必要的重渲染
+const PlaceholderOverlay = React.memo(PlaceholderOverlayInner);
 
 export const Drawnix: React.FC<DrawnixProps> = ({
   value,
@@ -542,10 +622,17 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   headerLeft,
   headerRight,
   onBack,
+  showMenuButton,
   onGenerateImage,
   onImageGenerated,
   imageGenerateOptions,
   isGenerating,
+  initialPlaceholder,
+  onPlaceholderUpdate,
+  projectId,
+  tasks,
+  onTaskRetry,
+  onTaskClick,
 }) => {
   const options: PlaitBoardOptions = {
     readonly: false,
@@ -574,6 +661,31 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   const lastPlaceholderPositionRef = useRef<{ x: number; y: number } | null>(null);
   const isInputFocusedRef = useRef(false);
 
+  // 使用 useMemo 缓存视口属性，避免不必要的重渲染
+  const viewportProps = React.useMemo(() => {
+    if (!board) return { zoom: 1, origX: 0, origY: 0 };
+    return {
+      zoom: board.viewport.zoom || 1,
+      origX: board.viewport.origination?.[0] || 0,
+      origY: board.viewport.origination?.[1] || 0,
+    };
+  }, [board?.viewport.zoom, board?.viewport.origination]);
+
+  // 恢复初始占位符（用于页面刷新后恢复任务）
+  useEffect(() => {
+    if (initialPlaceholder && !placeholderInfo) {
+      console.log('[Drawnix] Restoring placeholder from initialPlaceholder:', initialPlaceholder);
+      setPlaceholderInfo(initialPlaceholder);
+    }
+  }, [initialPlaceholder]);
+
+  // 当占位符更新时，通知父组件
+  useEffect(() => {
+    if (placeholderInfo && onPlaceholderUpdate) {
+      onPlaceholderUpdate(placeholderInfo);
+    }
+  }, [placeholderInfo, onPlaceholderUpdate]);
+
   if (board) {
     board.appState = appState;
   }
@@ -587,6 +699,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
 
   const plugins: PlaitPlugin[] = [
     withDraw,
+    withClearGroupIds,
     withGroup,
     withMind,
     withMindExtend,
@@ -625,49 +738,35 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     
     let width: number;
     let height: number;
-    let aspectRatio = options.aspect_ratio || '1:1';
+    // 始终使用用户选择的目标比例，而不是输入图片的比例
+    const aspectRatio = options.aspect_ratio || '1:1';
+    // 获取用户选择的尺寸 (1K/2K/4K)
+    const imageSize = options.image_size || '1K';
     
-    // 如果有输入图片，获取输入图片的尺寸
-    if (images && images.length > 0) {
-      try {
-        const img = new Image();
-        img.src = images[0];
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-        
-        // 使用输入图片的尺寸，保持宽高比
-        // 如果图片太大，适当缩小以适应视口
-        const maxSize = 600;
-        let imgWidth = img.width;
-        let imgHeight = img.height;
-        
-        // 如果图片太大，等比例缩小
-        if (imgWidth > maxSize || imgHeight > maxSize) {
-          const scale = Math.min(maxSize / imgWidth, maxSize / imgHeight);
-          imgWidth = imgWidth * scale;
-          imgHeight = imgHeight * scale;
-        }
-        
-        width = imgWidth;
-        height = imgHeight;
-        
-        // 计算新的宽高比
-        aspectRatio = `${Math.round(width / height * 10) / 10}:1`;
-      } catch (e) {
-        // 如果获取图片尺寸失败，使用默认尺寸
-        console.warn('Failed to get image dimensions, using default:', e);
-        const defaultSize = getPlaceholderSize(aspectRatio);
-        width = defaultSize.width;
-        height = defaultSize.height;
-      }
+    // 根据尺寸确定固定边长 (使用宽度作为基准)
+    // 1K: 宽度 200, 2K: 宽度 400, 4K: 宽度 800
+    const sizeBaseWidth: Record<string, number> = {
+      '1K': 200,
+      '2K': 400,
+      '4K': 800,
+    };
+    const baseWidth = sizeBaseWidth[imageSize] || 200;
+    
+    // 根据用户选择的目标比例计算高度
+    const [ratioW, ratioH] = aspectRatio.split(':').map(Number);
+    const ratio = ratioW / ratioH;
+    
+    if (ratio >= 1) {
+      // 横向比例或方形：宽度固定，高度按比例计算
+      width = baseWidth;
+      height = baseWidth / ratio;
     } else {
-      // 没有输入图片，使用默认尺寸
-      const defaultSize = getPlaceholderSize(aspectRatio);
-      width = defaultSize.width;
-      height = defaultSize.height;
+      // 竖向比例：高度固定，宽度按比例计算
+      height = baseWidth;
+      width = baseWidth * ratio;
     }
+    
+    // 如果有输入图片，记录下来用于生成时参考（但不改变占位符尺寸）
     
     // 简化：直接使用视口中心作为位置
     // 视口左上角在画布上的位置就是 viewport.origination
@@ -801,9 +900,18 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   };
 
   // 处理图片生成完成 - 直接在占位符位置渲染图片
-  const handleImageGenerated = async (imageUrl: string) => {
-    if (placeholderInfo && board) {
-      const { x, y, width, height } = placeholderInfo;
+  const handleImageGenerated = async (imageUrl: string, placeholderId?: string, taskId?: string) => {
+    console.log('[Drawnix] handleImageGenerated called:', { imageUrl: imageUrl.substring(0, 50), placeholderId, taskId });
+    
+    // 如果传入了 placeholderId，查找对应的占位符信息
+    let targetPlaceholder = placeholderInfo;
+    if (placeholderId && placeholderInfo && placeholderInfo.id !== placeholderId) {
+      // 如果 ID 不匹配，可能需要从其他地方获取（暂时使用当前的 placeholderInfo）
+      console.log('[Drawnix] placeholderId mismatch, using current placeholderInfo');
+    }
+    
+    if (targetPlaceholder && board) {
+      const { x, y, width, height } = targetPlaceholder;
       
       try {
         // 清除选中状态
@@ -943,6 +1051,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                 <PlaceholderOverlay
                   placeholder={placeholderInfo}
                   board={board}
+                  viewportZoom={viewportProps.zoom}
+                  viewportOrigX={viewportProps.origX}
+                  viewportOrigY={viewportProps.origY}
                   onPlaceholderMove={handlePlaceholderMove}
                 />
               )}
@@ -952,10 +1063,18 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                   <Tutorial />
                 )}
             </Board>
-            <AppToolbar headerLeft={headerLeft} headerRight={headerRight} onBack={onBack}></AppToolbar>
+            <AppToolbar
+              headerLeft={headerLeft}
+              headerRight={headerRight}
+              onBack={onBack}
+              showMenuButton={showMenuButton}
+              tasks={tasks}
+              onTaskClick={onTaskClick}
+            ></AppToolbar>
             <CreationToolbar></CreationToolbar>
             <ZoomToolbar></ZoomToolbar>
             <PopupToolbar></PopupToolbar>
+            <SelectionToolbar></SelectionToolbar>
             <LinkPopup></LinkPopup>
             <ClosePencilToolbar></ClosePencilToolbar>
             <TTDDialog container={containerRef.current}></TTDDialog>

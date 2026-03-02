@@ -85,6 +85,7 @@ const enTranslations: Translations = {
   'menu.exportImage.png': 'PNG',
   'menu.exportImage.jpg': 'JPG',
   'menu.cleanBoard': 'Clear Board',
+  'menu.rename': 'Rename',
   'menu.github': 'GitHub',
 
   // Dialog translations
@@ -172,9 +173,9 @@ const enTranslations: Translations = {
   'mind.centralText': 'Central Topic',
   'mind.abstractNodeText': 'Summary',
 
-  'tutorial.title': 'Drawnix',
+  'tutorial.title': 'Actum',
   'tutorial.description':
-    'All-in-one whiteboard, including mind maps, flowcharts, free drawing, and more',
+    'All-in-one whiteboard, making design simpler',
   'tutorial.dataDescription': 'All data is stored locally in your browser',
   'tutorial.appToolbar': 'Export, language settings, ...',
   'tutorial.creationToolbar': 'Select a tool to start your creation',

@@ -85,6 +85,7 @@ const zhTranslations: Translations = {
   'menu.exportImage.png': 'PNG',
   'menu.exportImage.jpg': 'JPG',
   'menu.cleanBoard': '清除画布',
+  'menu.rename': '重命名',
   'menu.github': 'GitHub',
 
   // Dialog translations
@@ -169,8 +170,8 @@ const zhTranslations: Translations = {
   
   #### 哇 是个程序员 🤯 ⌨️ 💡 👩 💻`,
 
-  'tutorial.title': 'Drawnix',
-  'tutorial.description': 'All-in-one 白板，包含思维导图、流程图、自由画笔等',
+  'tutorial.title': 'Actum',
+  'tutorial.description': 'All-in-one 白板，让设计变得更简单',
   'tutorial.dataDescription': '所有数据被存在你的浏览器本地',
   'tutorial.appToolbar': '导出，语言设置，...',
   'tutorial.creationToolbar': '选择一个工具开始你的创作',

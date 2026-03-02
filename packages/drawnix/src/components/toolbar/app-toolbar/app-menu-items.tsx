@@ -6,6 +6,7 @@ import {
   TrashIcon,
   UndoIcon,
   RedoIcon,
+  EditIcon,
 } from '../../icons';
 import { useBoard, useListRender } from '@plait-board/react-board';
 import {
@@ -22,6 +23,7 @@ import MenuItemLink from '../../menu/menu-item-link';
 import { saveAsImage, saveAsSvg } from '../../../utils/image';
 import { useDrawnix } from '../../../hooks/use-drawnix';
 import { useI18n } from '../../../i18n';
+import { clearCircularGroupReferences } from '../../../plugins/with-common';
 import Menu from '../../menu/menu';
 import { useContext } from 'react';
 import { MenuContentPropsContext } from '../../menu/common';
@@ -59,6 +61,8 @@ export const OpenFile = () => {
     if (theme) {
       board.theme = theme;
     }
+    // 加载数据后清除循环引用的 group，防止栈溢出
+    clearCircularGroupReferences(board);
     listRender.update(board.children, {
       board: board,
       parent: board,
@@ -72,6 +76,12 @@ export const OpenFile = () => {
       onSelect={() => {
         loadFromJSON(board).then((data) => {
           clearAndLoad(data.elements, data.viewport, data.theme);
+        }).catch((error) => {
+          // 用户取消文件选择时，showOpenFilePicker 会抛出 AbortError
+          // 这种情况不需要显示错误信息
+          if (error.name !== 'AbortError') {
+            console.error('Failed to open file:', error);
+          }
         });
       }}
       icon={OpenFileIcon}
@@ -257,3 +267,18 @@ export const ThemeMenuItem = () => {
   );
 };
 ThemeMenuItem.displayName = 'ThemeMenuItem';
+
+export const RenameMenuItem = ({ onRename }: { onRename?: () => void }) => {
+  const { t } = useI18n();
+  return (
+    <MenuItem
+      icon={EditIcon}
+      onSelect={() => {
+        onRename?.();
+      }}
+    >
+      {t('menu.rename')}
+    </MenuItem>
+  );
+};
+RenameMenuItem.displayName = 'RenameMenuItem';

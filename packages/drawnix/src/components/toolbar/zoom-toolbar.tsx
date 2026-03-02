@@ -1,7 +1,5 @@
 import { useBoard } from '@plait-board/react-board';
 import Stack from '../stack';
-import { ToolButton } from '../tool-button';
-import {  ZoomInIcon, ZoomOutIcon } from '../icons';
 import classNames from 'classnames';
 import {
   ATTACHED_ELEMENT_CLASS_NAME,
@@ -26,18 +24,18 @@ export const ZoomToolbar = () => {
       className={classNames('zoom-toolbar', ATTACHED_ELEMENT_CLASS_NAME)}
     >
       <Stack.Row gap={1}>
-        <ToolButton
+        <button
           key={0}
           type="button"
-          icon={ZoomOutIcon}
-          visible={true}
           title={t('zoom.out')}
           aria-label={t('zoom.out')}
           onPointerUp={() => {
             BoardTransforms.updateZoom(board, board.viewport.zoom - 0.1);
           }}
           className="zoom-out-button"
-        />
+        >
+          −
+        </button>
         <Popover
           sideOffset={12}
           open={zoomMenuOpen}
@@ -87,18 +85,18 @@ export const ZoomToolbar = () => {
             </Menu>
           </PopoverContent>
         </Popover>
-        <ToolButton
+        <button
           key={2}
           type="button"
-          icon={ZoomInIcon}
-          visible={true}
           title={t('zoom.in')}
           aria-label={t('zoom.in')}
           onPointerUp={() => {
             BoardTransforms.updateZoom(board, board.viewport.zoom + 0.1);
           }}
           className="zoom-in-button"
-        />
+        >
+          +
+        </button>
       </Stack.Row>
     </Island>
   );

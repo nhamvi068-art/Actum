@@ -1,0 +1,621 @@
+.task-notification-panel {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 360px;
+  max-height: 500px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  transition: all 0.3s ease;
+
+  &--expanded {
+    .task-notification-panel__content {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+    }
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #fff;
+    color: #667eea;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  &__toggle {
+    display: flex;
+    align-items: center;
+  }
+
+  &__chevron {
+    transition: transform 0.3s ease;
+
+    &--up {
+      transform: rotate(180deg);
+    }
+  }
+
+  &__content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 16px;
+    color: #999;
+    font-size: 13px;
+  }
+
+  &__footer {
+    padding: 12px 16px;
+    border-top: 1px solid #eee;
+  }
+
+  &__clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    background: #f5f5f5;
+    border: none;
+    border-radius: 6px;
+    color: #666;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #eee;
+      color: #333;
+    }
+  }
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: #f9f9f9;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__status {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__status-icon {
+    &--pending {
+      color: #faad14;
+    }
+
+    &--generating {
+      color: #1890ff;
+      animation: spin 1s linear infinite;
+    }
+
+    &--completed {
+      color: #52c41a;
+    }
+
+    &--failed {
+      color: #ff4d4f;
+    }
+  }
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__prompt {
+    font-size: 13px;
+    color: #333;
+    line-height: 1.4;
+    word-break: break-word;
+    margin-bottom: 4px;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #999;
+  }
+
+  &__status-text {
+    &--pending {
+      color: #faad14;
+    }
+
+    &--generating {
+      color: #1890ff;
+    }
+
+    &--completed {
+      color: #52c41a;
+    }
+
+    &--failed {
+      color: #ff4d4f;
+    }
+  }
+
+  &__time {
+    color: #999;
+  }
+
+  &__error {
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: #fff2f0;
+    border: 1px solid #ffccc7;
+    border-radius: 4px;
+    color: #ff4d4f;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  &__actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__progress {
+    width: 40px;
+    height: 4px;
+    background: #f0f0f0;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  &__progress-bar {
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
+    animation: progress 1.5s ease-in-out infinite;
+  }
+
+  &__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &--retry {
+      background: #e6f7ff;
+      color: #1890ff;
+
+      &:hover {
+        background: #bae7ff;
+        color: #096dd9;
+      }
+    }
+
+    &--delete {
+      background: #fff1f0;
+      color: #ff4d4f;
+
+      &:hover {
+        background: #ffccc7;
+        color: #cf1322;
+      }
+    }
+  }
+
+  &__completed-icon {
+    color: #52c41a;
+  }
+
+  // Status specific styles
+  &--generating {
+    background: #f0f7ff;
+  }
+
+  &--failed {
+    background: #fff9f9;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes progress {
+  0% {
+    width: 0%;
+    margin-left: 0;
+  }
+  50% {
+    width: 60%;
+    margin-left: 20%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}
+
+// Task List Button (Toolbar)
+.task-list-button-container {
+  position: relative;
+}
+
+.task-list-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: #333;
+  }
+
+  &--active {
+    background: rgba(0, 0, 0, 0.08);
+    color: #333;
+  }
+
+  &__badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: #667eea;
+    color: #fff;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+// Task List Popup
+.task-list-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 280px;
+  width: auto;
+  max-width: 320px;
+  max-height: calc(100vh - 120px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #fff;
+    color: #667eea;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 100px;
+    max-height: calc(100vh - 220px);
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 16px;
+    color: #999;
+    font-size: 13px;
+  }
+
+  &__footer {
+    padding: 12px 16px;
+    border-top: 1px solid #eee;
+    flex-shrink: 0;
+  }
+
+  &__clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    background: #f5f5f5;
+    border: none;
+    border-radius: 6px;
+    color: #666;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #eee;
+      color: #333;
+    }
+  }
+}
+
+// Task Item with Thumbnail
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: #f9f9f9;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__thumbnail {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f5f5f5;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+    }
+  }
+
+  &__status {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__prompt {
+    font-size: 13px;
+    color: #333;
+    line-height: 1.4;
+    word-break: break-word;
+    margin-bottom: 4px;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #999;
+  }
+
+  &__status-text {
+    &--pending {
+      color: #faad14;
+    }
+
+    &--generating {
+      color: #1890ff;
+    }
+
+    &--completed {
+      color: #52c41a;
+    }
+
+    &--failed {
+      color: #ff4d4f;
+    }
+  }
+
+  &__time {
+    color: #999;
+  }
+
+  &__error {
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: #fff2f0;
+    border: 1px solid #ffccc7;
+    border-radius: 4px;
+    color: #ff4d4f;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  &__actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__progress {
+    width: 40px;
+    height: 4px;
+    background: #f0f0f0;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  &__progress-bar {
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
+    animation: progress 1.5s ease-in-out infinite;
+  }
+
+  &__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &--retry {
+      background: #e6f7ff;
+      color: #1890ff;
+
+      &:hover {
+        background: #bae7ff;
+        color: #096dd9;
+      }
+    }
+
+    &--delete {
+      background: #fff1f0;
+      color: #ff4d4f;
+
+      &:hover {
+        background: #ffccc7;
+        color: #cf1322;
+      }
+    }
+  }
+
+  &__completed-icon {
+    color: #52c41a;
+  }
+
+  // Status specific styles
+  &--generating {
+    background: #f0f7ff;
+  }
+
+  &--failed {
+    background: #fff9f9;
+  }
+}

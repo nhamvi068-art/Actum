@@ -41,6 +41,7 @@ export interface ImageGenerateOptions {
 export const MODEL_OPTIONS = [
   { value: 'nano-banana', label: 'Nano Banana' },
   { value: 'nano-banana-pro', label: 'Nano Banana Pro' },
+  { value: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash' },
 ];
 
 // 尺寸选项
@@ -149,12 +150,18 @@ export const ASPECT_RATIO_OPTIONS = [
 ];
 
 // 模型映射：将前端选项映射到实际的模型
+// gemini-3.1-flash-image-preview - 不需要映射，所有尺寸都用同一个模型
 // Nano Banana + 1K → nano-banana
 // Nano Banana + 4K → nano-banana-hd
 // Nano Banana Pro + 1K → nano-banana-2
 // Nano Banana Pro + 2K → nano-banana-2-2k
 // Nano Banana Pro + 4K → nano-banana-2-4k
 const mapToActualModel = (model: string, size: string): string => {
+  // gemini-3.1-flash-image-preview 不需要映射，直接返回
+  if (model === 'gemini-3.1-flash-image-preview') {
+    return 'gemini-3.1-flash-image-preview';
+  }
+  
   if (model === 'nano-banana-pro') {
     // Pro 系列
     if (size === '1K') return 'nano-banana-2';
@@ -196,7 +203,9 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('1:1');
 
   // Nano Banana 不支持 2K 分辨率
+  // gemini-3.1-flash-image-preview 支持所有尺寸
   const isNanoBanana = selectedModel === 'nano-banana';
+  const isGeminiModel = selectedModel === 'gemini-3.1-flash-image-preview';
   const availableSizes = isNanoBanana 
     ? SIZE_OPTIONS.filter(s => s.value !== '2K')
     : SIZE_OPTIONS;

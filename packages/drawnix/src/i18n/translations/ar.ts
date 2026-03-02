@@ -85,6 +85,7 @@ const arTranslations: Translations = {
     "menu.exportImage.png": "PNG",
     "menu.exportImage.jpg": "JPG",
     "menu.cleanBoard": "مسح اللوحة",
+    "menu.rename": "إعادة تسمية",
     "menu.github": "غيت هب",
 
     // Dialog translations
@@ -170,8 +171,8 @@ const arTranslations: Translations = {
     "mind.centralText": "الموضوع المركزي",
     "mind.abstractNodeText": "ملخص",
     
-    'tutorial.title': 'Drawnix',
-    'tutorial.description': 'سبورة شاملة تتضمن الخرائط الذهنية والمخططات الانسيابية والرسم الحر وغير ذلك',
+    'tutorial.title': 'Actum',
+    'tutorial.description': 'سبورة شاملة تجعل التصميم أبسط',
     'tutorial.dataDescription': 'تُحفظ جميع البيانات محليًا في متصفحك',
     'tutorial.appToolbar': 'تصدير، إعدادات اللغة، ...',
     'tutorial.creationToolbar': 'اختر أداة لبدء الإنشاء',

@@ -420,6 +420,113 @@ export const FontColorIcon: React.FC<{ currentColor?: string }> = ({
   );
 };
 
+// Text Bold Icon
+export const TextBoldIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+    <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+  </svg>
+);
+
+// Text Italic Icon
+export const TextItalicIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="4" x2="10" y2="4"></line>
+    <line x1="14" y1="20" x2="5" y2="20"></line>
+    <line x1="15" y1="4" x2="9" y2="20"></line>
+  </svg>
+);
+
+// Text Underline Icon
+export const TextUnderlineIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path>
+    <line x1="4" y1="21" x2="20" y2="21"></line>
+  </svg>
+);
+
+// Text Strikethrough Icon
+export const TextStrikethroughIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="12" x2="20" y2="12"></line>
+    <path d="M17.5 7.5c-.5-2-2.5-3.5-5.5-3.5c-3.5 0-5.5 2-5.5 4s1.5 3.5 5.5 4c3 .4 5 1.5 5.5 3.5.5 2.5-2 4.5-5.5 4.5c-3.5 0-5.5-2-5.5-4"></path>
+  </svg>
+);
+
+// Align Left Icon
+export const AlignLeftOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="17" y1="10" x2="3" y2="10"></line>
+    <line x1="21" y1="6" x2="3" y2="6"></line>
+    <line x1="21" y1="14" x2="3" y2="14"></line>
+    <line x1="17" y1="18" x2="3" y2="18"></line>
+  </svg>
+);
+
+// Align Center Icon
+export const AlignCenterOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="10" x2="6" y2="10"></line>
+    <line x1="21" y1="6" x2="3" y2="6"></line>
+    <line x1="21" y1="14" x2="3" y2="14"></line>
+    <line x1="18" y1="18" x2="6" y2="18"></line>
+  </svg>
+);
+
+// Align Right Icon
+export const AlignRightOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="21" y1="10" x2="7" y2="10"></line>
+    <line x1="21" y1="6" x2="3" y2="6"></line>
+    <line x1="21" y1="14" x2="3" y2="14"></line>
+    <line x1="21" y1="18" x2="7" y2="18"></line>
+  </svg>
+);
+
+// Align Justify Icon
+export const AlignJustifyOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="10" x2="21" y2="10"></line>
+    <line x1="3" y1="6" x2="21" y2="6"></line>
+    <line x1="3" y1="14" x2="21" y2="14"></line>
+    <line x1="3" y1="18" x2="21" y2="18"></line>
+  </svg>
+);
+
+// Chevron Down Icon
+export const ChevronDownIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+
+// Lock On Icon (filled)
+export const LockOnIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+  </svg>
+);
+
+// Lock Off Icon
+export const LockOffIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+  </svg>
+);
+
+// Lightbulb Icon (AI)
+export const LightbulbIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 18h6"></path>
+    <path d="M10 22h4"></path>
+    <path d="M12 2v1"></path>
+    <path d="M12 7a5 5 0 1 0-4 4.665 5 5 0 0 1 .53-2.665L12 9v2"></path>
+    <path d="M12 13l-1.5 1.5"></path>
+  </svg>
+);
+
 export const UndoIcon = createIcon(
   <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
     <g stroke="none" fill="currentColor">
@@ -750,5 +857,83 @@ export const DownloadOutlined = createIcon(
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
     <polyline points="7 10 12 15 17 10"></polyline>
     <line x1="12" y1="15" x2="12" y2="3"></line>
+  </svg>
+);
+
+// 
+// 图层顺序图标 - 置顶
+export const AlignTopOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="17 11 12 6 7 11"></polyline>
+    <polyline points="17 18 12 13 7 18"></polyline>
+  </svg>
+);
+
+// 图层顺序图标 - 置底
+export const AlignBottomOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="7 13 12 18 17 13"></polyline>
+    <polyline points="7 6 12 11 17 6"></polyline>
+  </svg>
+);
+
+// 图层顺序图标 - 上移
+export const ArrowUpOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"></line>
+    <polyline points="5 12 12 5 19 12"></polyline>
+  </svg>
+);
+
+// 图层顺序图标 - 下移
+export const ArrowDownOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <polyline points="19 12 12 19 5 12"></polyline>
+  </svg>
+);
+
+// 图层图标
+export const LayersOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+    <polyline points="2 17 12 22 22 17"></polyline>
+    <polyline points="2 12 12 17 22 12"></polyline>
+  </svg>
+);
+
+// 尺寸图标 - 简洁的框形图标
+export const SizeOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 3 21 3 21 9"></polyline>
+    <polyline points="9 21 3 21 3 15"></polyline>
+    <line x1="21" y1="3" x2="14" y2="10"></line>
+    <line x1="3" y1="21" x2="10" y2="14"></line>
+  </svg>
+);
+
+// 锁定比例图标 - 铁链
+export const LinkOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+  </svg>
+);
+
+// 解除锁定比例图标
+export const LinkBrokenOutlined = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+    <line x1="2" y1="2" x2="22" y2="22"></line>
+  </svg>
+);
+
+// 智能拆图图标 - 剪刀剪开图片
+export const SplitImageIcon = createIcon(
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+    <line x1="12" y1="3" x2="12" y2="21"></line>
+    <line x1="3" y1="12" x2="21" y2="12"></line>
   </svg>
 );

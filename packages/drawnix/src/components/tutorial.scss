@@ -64,43 +64,6 @@
   .feature-pointer {
     position: absolute;
   }
-
-  .top-left {
-    position: absolute;
-    top: 100px;
-    left: 60px;
-    .pointer-content {
-      position: absolute;
-      top: 100px;
-      width: 100%;
-      text-align: center;
-      left: 20px;
-    }
-  }
-
-  .top-center {
-    top: 100px;
-    left: 50%;
-    width: 200px;
-    transform: translateX(-50%);
-    .pointer-content {
-      position: absolute;
-      width: 100%;
-      top: 50px;
-      left: 60px;
-    }
-  }
-
-  .bottom-right {
-    bottom: 70px;
-    right: 40px;
-    .pointer-content {
-      position: absolute;
-      top: -30px;
-      right: 80px;
-      width: 100%;
-    }
-  }
 }
 
 @media screen and (max-width: 768px){

@@ -85,6 +85,7 @@ const viTranslations: Translations = {
     'menu.exportImage.png': 'PNG',
     'menu.exportImage.jpg': 'JPG',
     'menu.cleanBoard': 'Xóa bảng',
+  'menu.rename': 'Đổi tên',
     'menu.github': 'GitHub',
 
     // Dialog translations
@@ -172,8 +173,8 @@ const viTranslations: Translations = {
     'mind.centralText': 'Chủ đề trung tâm',
     'mind.abstractNodeText': 'Tóm tắt',
 
-    'tutorial.title': 'DPIT Draw MindMap',
-    'tutorial.description': 'Bảng trắng tất cả trong một, bao gồm sơ đồ tư duy, lưu đồ, vẽ tự do và hơn thế nữa',
+    'tutorial.title': 'Actum',
+    'tutorial.description': 'Bảng trắng tất cả trong một, giúp thiết kế trở nên đơn giản hơn',
     'tutorial.dataDescription': 'Tất cả dữ liệu được lưu trữ cục bộ trong trình duyệt của bạn',
     'tutorial.appToolbar': 'Xuất, cài đặt ngôn ngữ, ...',
     'tutorial.creationToolbar': 'Chọn một công cụ để bắt đầu sáng tạo',
