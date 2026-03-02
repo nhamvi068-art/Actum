@@ -22,6 +22,9 @@ import { DrawI18nKey, PlaitDrawElement } from '@plait/draw';
 import { MindI18nKey } from '@plait/mind';
 import { i18nInsidePlaitHook } from '../i18n';
 
+// 覆盖 Transforms.insertNode 以在插入新元素前清除循环引用
+import { Transforms as CoreTransforms } from '@plait/core';
+
 // 清除循环引用的 group（导出供外部使用）
 // 使用更简单直接的方法：直接清除所有有 groupId 的元素的 groupId
 // 因为循环引用是错误数据，清除所有 groupId 是最安全的方式
@@ -47,9 +50,6 @@ export const clearCircularGroupReferences = (board: PlaitBoard): void => {
     (board as any).groupCache = undefined;
   }
 };
-
-// 覆盖 Transforms.insertNode 以在插入新元素前清除循环引用
-import { Transforms as CoreTransforms } from '@plait/core';
 
 export const withCommonPlugin = (board: PlaitBoard) => {
   const newBoard = board as PlaitBoard & PlaitImageBoard & PlaitI18nBoard;

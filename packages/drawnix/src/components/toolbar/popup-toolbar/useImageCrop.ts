@@ -98,7 +98,7 @@ export const useImageCrop = (imageUrl: string) => {
   // Handle crop ratio change
   const handleCropRatioChange = useCallback((ratioKey: string, ratioValue: number) => {
     setState(prev => {
-      let newBox = { ...prev.cropBox };
+      const newBox = { ...prev.cropBox };
 
       if (ratioValue > 0) {
         const imgWidth = prev.rotateDegree % 180 !== 0 ? prev.imageHeight : prev.imageWidth;

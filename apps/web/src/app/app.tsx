@@ -82,7 +82,7 @@ const MAX_STORAGE_FAILURES = 3;
 // SessionStorage 降级方案
 const sessionStorageCache = new Map<string, string>();
 
-async function safeSetItem<T>(key: string, value: T, compress: boolean = false): Promise<boolean> {
+async function safeSetItem<T>(key: string, value: T, compress = false): Promise<boolean> {
   // If storage has repeatedly failed, stop trying to avoid infinite loops
   if (storageFailed && storageFailCount >= MAX_STORAGE_FAILURES) {
     // 降级到 sessionStorage
@@ -156,7 +156,7 @@ function fallbackToSessionStorage<T>(key: string, value: T, compress: boolean): 
 }
 
 // 安全获取数据（支持解压缩）
-async function safeGetItem<T>(key: string, compressed: boolean = false): Promise<T | null> {
+async function safeGetItem<T>(key: string, compressed = false): Promise<T | null> {
   try {
     const data = await localforage.getItem<T>(key);
     if (data && compressed && typeof data === 'string') {
