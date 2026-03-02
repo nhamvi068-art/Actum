@@ -239,7 +239,7 @@ export async function getActiveTasks(projectId?: string): Promise<ImageTask[]> {
 // Subscribe to task changes (simple implementation using polling)
 export function subscribeToTasks(
   callback: (tasks: ImageTask[]) => void,
-  interval: number = 1000
+  interval = 1000
 ): () => void {
   let isActive = true;
   
