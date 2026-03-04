@@ -2,6 +2,29 @@ import localforage from 'localforage';
 
 const API_CONFIG_KEY = 'api_config';
 
+// 异步任务响应
+export interface AsyncTaskResponse {
+  code: string;
+  message: string;
+  data: string; // task_id
+}
+
+// 任务状态响应
+export interface TaskStatusResponse {
+  code: string;
+  message: string;
+  data: {
+    task_id: string;
+    status: 'IN_PROGRESS' | 'FAILURE' | 'SUCCESS';
+    fail_reason?: string;
+    progress: string;
+    data?: {
+      data?: Array<{ url?: string; b64_json?: string }>;
+      created?: number;
+    };
+  };
+}
+
 export interface ApiConfig {
   apiKey: string;
   baseUrl: string;
@@ -125,6 +148,110 @@ export async function generateImage(params: GenerateImageParams): Promise<ImageG
   return data;
 }
 
+// 生成图片（异步模式）
+export async function generateImageAsync(params: GenerateImageParams): Promise<AsyncTaskResponse> {
+  const config = await getApiConfig();
+  const url = buildApiUrl(config.baseUrl, '/v1/images/generations?async=true');
+
+  const requestBody = {
+    model: params.model || 'nano-banana',
+    prompt: params.prompt,
+    aspect_ratio: params.aspect_ratio || '1:1',
+    response_format: params.response_format || 'url',
+    image_size: params.image_size,
+    image: params.image,
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || errorData.message || '请求失败');
+  }
+
+  return response.json();
+}
+
+// 查询任务状态
+export async function getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+  const config = await getApiConfig();
+  const url = buildApiUrl(config.baseUrl, `/v1/images/tasks/${taskId}`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('查询任务状态失败');
+  }
+
+  return response.json();
+}
+
+// 轮询等待任务完成
+export async function waitForTaskComplete(
+  taskId: string,
+  onProgress?: (status: string, progress: number) => void,
+  timeoutMs: number = 300000,
+  pollIntervalMs: number = 3000
+): Promise<ImageGenerationResponse> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    const result = await getTaskStatus(taskId);
+    const status = result.data.status;
+    const progress = parseInt(result.data.progress || '0');
+
+    onProgress?.(status, progress);
+
+    if (status === 'SUCCESS') {
+      // 尝试兼容不同的后端返回结构：
+      // 1) result.data.data.data 为真正的图片数组
+      // 2) 或者 result.data.data 直接就是图片数组
+      const nestedData: any = result.data.data;
+      const imageData = nestedData?.data || nestedData;
+
+      if (imageData && Array.isArray(imageData)) {
+        return {
+          created: nestedData?.created || Math.floor(Date.now() / 1000),
+          data: imageData,
+        };
+      }
+
+      // 任务成功但没有拿到图片数据：打出结构，便于定位后端返回差异
+      console.error('[waitForTaskComplete] SUCCESS but no image data', {
+        taskId,
+        status,
+        progress: result.data.progress,
+        resultData: result.data,
+      });
+    }
+
+    if (status === 'FAILURE') {
+      throw new Error(result.data.fail_reason || '图片生成失败');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+
+  console.error('[waitForTaskComplete] timeout', {
+    taskId,
+    timeoutMs,
+  });
+  throw new Error('图片生成超时');
+}
+
 // 可用的图片比例
 export const ASPECT_RATIOS = [
   { value: '1:1', label: '1:1' },
@@ -153,5 +280,27 @@ export const MODELS = [
   { value: 'nano-banana-2', label: 'nano-banana-2' },
   { value: 'nano-banana-2-2k', label: 'nano-banana-2-2k (2K)' },
   { value: 'nano-banana-2-4k', label: 'nano-banana-2-4k (4K)' },
+  { value: 'gemini-3.1-flash-image-preview-512px', label: 'gemini-3.1-flash-image-preview-512px (1K)' },
+  { value: 'gemini-3.1-flash-image-preview-2k', label: 'gemini-3.1-flash-image-preview-2k (2K)' },
+  { value: 'gemini-3.1-flash-image-preview-4k', label: 'gemini-3.1-flash-image-preview-4k (4K)' },
 ];
+
+// 将URL图片转换为Base64（用于永久保存）
+export async function urlToBase64(url: string): Promise<string> {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    throw new Error(`URL转Base64失败: ${error instanceof Error ? error.message : '未知错误'}`);
+  }
+}
 

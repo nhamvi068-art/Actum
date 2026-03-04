@@ -1,7 +1,7 @@
 import localforage from 'localforage';
 
 // Task status enum
-export type TaskStatus = 'pending' | 'generating' | 'completed' | 'failed';
+export type TaskStatus = 'pending' | 'submitting' | 'generating' | 'completed' | 'failed';
 
 // Placeholder info for task persistence
 export interface PlaceholderInfo {
@@ -24,12 +24,14 @@ export interface ImageTask {
   imageSize?: string;
   referenceImages?: string[];
   placeholderInfo: PlaceholderInfo;
-  resultImageUrl?: string;
+  resultImageUrl?: string; // Base64格式（用于画布显示）
+  originalUrl?: string;   // 原始URL（用于下载）
   error?: string;
   retryCount: number;
   createdAt: string;
   updatedAt: string;
   projectId: string;
+  cancelled?: boolean; // 标记任务是否被取消
 }
 
 // Storage key
@@ -122,31 +124,37 @@ export async function updateTaskStatus(
   taskId: string,
   status: TaskStatus,
   resultImageUrl?: string,
-  error?: string
+  error?: string,
+  originalUrl?: string
 ): Promise<ImageTask | null> {
   const tasks = await getAllTasks();
   const taskIndex = tasks.findIndex(t => t.id === taskId);
-  
+
   if (taskIndex === -1) {
     return null;
   }
-  
+
   const task = tasks[taskIndex];
   task.status = status;
   task.updatedAt = new Date().toISOString();
-  
+
   if (resultImageUrl) {
     task.resultImageUrl = resultImageUrl;
     task.placeholderInfo.imageUrl = resultImageUrl;
   }
-  
+
+  // 保存原始URL（用于下载）
+  if (originalUrl) {
+    task.originalUrl = originalUrl;
+  }
+
   if (error) {
     task.error = error;
   }
-  
+
   tasks[taskIndex] = task;
   await saveTasks(tasks);
-  
+
   return task;
 }
 
@@ -189,6 +197,33 @@ export async function incrementRetryCount(taskId: string): Promise<ImageTask | n
   await saveTasks(tasks);
   
   return task;
+}
+
+// Cancel a task
+export async function cancelTask(taskId: string): Promise<ImageTask | null> {
+  const tasks = await getAllTasks();
+  const taskIndex = tasks.findIndex(t => t.id === taskId);
+  
+  if (taskIndex === -1) {
+    return null;
+  }
+  
+  const task = tasks[taskIndex];
+  task.cancelled = true;
+  task.status = 'failed';
+  task.error = '任务已取消';
+  task.updatedAt = new Date().toISOString();
+  
+  tasks[taskIndex] = task;
+  await saveTasks(tasks);
+  
+  return task;
+}
+
+// Check if task is cancelled
+export async function isTaskCancelled(taskId: string): Promise<boolean> {
+  const task = await getTaskById(taskId);
+  return task?.cancelled || false;
 }
 
 // Delete task

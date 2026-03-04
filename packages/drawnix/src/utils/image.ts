@@ -102,3 +102,23 @@ export const convertUrlToBase64 = async (url: string): Promise<string> => {
     img.src = url;
   });
 };
+
+// 下载原始尺寸图片（用于AI生成的图片）
+export const downloadOriginalImage = async (url: string, filename?: string): Promise<void> => {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+
+    // 从URL中提取文件扩展名
+    const urlExt = url.split('.').pop()?.split('?')[0]?.toLowerCase();
+    const validExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    const ext = validExts.includes(urlExt || '') ? urlExt : 'png';
+
+    const imageName = filename || `generated-image-${Date.now()}.${ext}`;
+    download(blob, imageName);
+  } catch (error) {
+    console.error('Failed to download original image:', error);
+    // 兜底：使用URL直接下载
+    window.open(url, '_blank');
+  }
+};

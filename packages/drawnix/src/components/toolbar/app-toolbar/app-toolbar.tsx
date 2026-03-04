@@ -100,9 +100,10 @@ interface AppToolbarProps {
   // Task list props
   tasks?: any[];
   onTaskClick?: (task: any) => void;
+  onTaskRedo?: (task: any) => void;
 }
 
-export const AppToolbar = ({ headerLeft, headerRight, onBack, showMenuButton = true, tasks = [], onTaskClick }: AppToolbarProps) => {
+export const AppToolbar = ({ headerLeft, headerRight, onBack, showMenuButton = true, tasks = [], onTaskClick, onTaskRedo }: AppToolbarProps) => {
   const board = useBoard();
   const { t } = useI18n();
   const container = PlaitBoard.getBoardContainer(board);

@@ -225,13 +225,27 @@ export type DrawnixProps = {
   // 任务恢复相关
   initialPlaceholder?: PlaceholderInfo;
   onPlaceholderUpdate?: (placeholderInfo: PlaceholderInfo) => void;
+  onPlaceholderStatusChange?: (placeholderId: string, status: 'pending' | 'submitting' | 'generating' | 'completed' | 'failed', errorMessage?: string) => void;
+  // 占位符选中相关
+  onPlaceholderSelect?: (placeholderId: string) => void;
+  onPlaceholderDelete?: (placeholderId: string) => void;
+  onPlaceholderRetry?: (placeholderId: string) => void;
+  selectedPlaceholderId?: string | null;
   // 任务列表相关
   projectId?: string;
   tasks?: any[];
   onTaskRetry?: (task: any) => void;
+  onTaskRedo?: (task: any) => void;
   onTaskClick?: (task: any) => void;
-  onTaskRetry?: (task: any) => void;
-  onTaskClick?: (task: any) => void;
+  // 输入栏填充相关（用于重做功能）
+  fillInputData?: {
+    prompt: string;
+    images: string[];
+    model: string;
+    aspectRatio: string;
+    imageSize?: string;
+  };
+  onFillInput?: (data: { prompt: string; images: string[]; model: string; aspectRatio: string; imageSize?: string }) => void;
 } & React.HTMLAttributes<HTMLDivElement>;
 
 // 占位块信息接口
@@ -244,6 +258,12 @@ export interface PlaceholderInfo {
   aspectRatio: string;
   placeholderElement?: PlaitElement;
   imageUrl?: string; // 用于显示生成的图片
+  // 新增：状态和提示信息
+  status?: 'pending' | 'submitting' | 'generating' | 'completed' | 'failed';
+  prompt?: string; // 用户输入的 prompt
+  errorMessage?: string; // 错误信息
+  taskId?: string; // 关联的任务 ID
+  startTime?: number; // 生成开始时间
 }
 
 // 比例尺寸对照表 - 占位块的显示尺寸（像素）
@@ -435,10 +455,25 @@ interface PlaceholderOverlayProps {
   viewportOrigX: number;
   viewportOrigY: number;
   onPlaceholderMove?: (x: number, y: number) => void;
+  isSelected?: boolean;
+  onSelect?: (placeholderId: string) => void;
+  onDelete?: (placeholderId: string) => void;
+  onRetry?: (placeholderId: string) => void;
 }
 
 // 加载动画覆盖层组件 - 优化版本，使用独立的视口属性避免不必要的重渲染
-const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({ placeholder, board, viewportZoom, viewportOrigX, viewportOrigY, onPlaceholderMove }) => {
+const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
+  placeholder,
+  board,
+  viewportZoom,
+  viewportOrigX,
+  viewportOrigY,
+  onPlaceholderMove,
+  isSelected = false,
+  onSelect,
+  onDelete,
+  onRetry,
+}) => {
   const elementX = placeholder.x;
   const elementY = placeholder.y;
   const elementWidth = placeholder.width;
@@ -498,6 +533,7 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({ placeholde
     let snapLinesG: SVGGElement | null = null;
     
     const handlePointerMove = (moveEvent: PointerEvent) => {
+      const zoom = screenPosition.zoom;
       const deltaX = (moveEvent.clientX - startX) / zoom;
       const deltaY = (moveEvent.clientY - startY) / zoom;
       let newX = origElementX + deltaX;
@@ -573,10 +609,65 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({ placeholde
     document.addEventListener('pointerup', handlePointerUp, { passive: false });
   };
   
+  // 截断 prompt 显示
+  const truncatePrompt = (prompt?: string, maxLength: number = 50): string => {
+    if (!prompt) return '';
+    if (prompt.length <= maxLength) return prompt;
+    return prompt.substring(0, maxLength) + '...';
+  };
+
+  // 状态显示
+  const status = placeholder.status || 'generating';
+  const isError = status === 'failed';
+  const isSubmitting = status === 'submitting';
+
+  // 生成时间显示（纯秒数格式，如 1200s）
+  const [timeElapsed, setTimeElapsed] = useState<string>('');
+
+  // 点击占位符选中
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelect) {
+      onSelect(placeholder.id);
+    }
+  };
+
+  // 处理删除按钮点击
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) {
+      onDelete(placeholder.id);
+    }
+  };
+
+  // 处理重试按钮点击
+  const handleRetryClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onRetry) {
+      onRetry(placeholder.id);
+    }
+  };
+
+  useEffect(() => {
+    if ((status === 'generating' || status === 'submitting') && placeholder.startTime) {
+      const updateTime = () => {
+        const now = Date.now();
+        const diff = Math.floor((now - placeholder.startTime!) / 1000);
+        setTimeElapsed(`${diff}s`);
+      };
+
+      updateTime(); // Initial update
+      const interval = setInterval(updateTime, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setTimeElapsed('');
+    }
+  }, [status, placeholder.startTime]);
+
   return (
     <>
       <div
-        className="image-placeholder"
+        className={`image-placeholder ${isError ? 'placeholder-error' : ''} ${isSelected ? 'placeholder-selected' : ''}`}
         style={{
           position: 'absolute',
           left: screenPosition.left,
@@ -586,20 +677,110 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({ placeholde
           overflow: 'hidden',
           pointerEvents: 'auto',
           cursor: 'grab',
-          background: '#e5e7eb',
+          background: isError ? '#fef2f2' : '#e5e7eb',
           userSelect: 'none',
+          border: isSelected ? '2px solid #1890ff' : (isError ? '1px solid #fecaca' : '1px solid #e5e7eb'),
+          boxShadow: isSelected ? '0 0 0 2px rgba(24, 144, 255, 0.3)' : 'none',
+          zIndex: 9999,
+          touchAction: 'none',
         }}
         onPointerDown={handlePointerDown}
+        onClick={handleClick}
       >
-      {/* 渐变背景动画效果 */}
-      <div
-        className="placeholder-gradient"
-        style={{
-          position: 'absolute',
-          inset: 0,
-        }}
-      />
-    </div>
+        {/* Simple Gradient Background */}
+        <div className="placeholder-gradient" />
+
+        {/* Multi-color Fluid Aura Animation for Generating Status */}
+        {(status === 'generating' || status === 'submitting' || status === 'pending') && (
+          <div className="placeholder-blob-container">
+            <div className="color-blob color-blob-1"></div>
+            <div className="color-blob color-blob-2"></div>
+            <div className="color-blob color-blob-3"></div>
+            <div className="water-drop"></div>
+          </div>
+        )}
+
+        {/* 状态显示层 - 仅报错时显示 */}
+        <div className={`Placeholder-status ${status === 'failed' ? 'is-error' : ''}`}>
+          {/* 提交中状态 */}
+          {status === 'submitting' && (
+            <div
+              className="placeholder-submitting"
+              style={{
+                transform: `scale(${screenPosition.zoom})`,
+                transformOrigin: 'bottom right'
+              }}
+            >
+              <div className="submitting-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <span>提交中...</span>
+            </div>
+          )}
+
+          {/* 生成中状态 */}
+          {status === 'generating' && (
+            <div
+              className="placeholder-generating"
+              style={{
+                transform: `scale(${screenPosition.zoom})`,
+                transformOrigin: 'bottom right'
+              }}
+            >
+              <div className="breathing-dot"></div>
+              {timeElapsed && <div className="placeholder-time">{timeElapsed}</div>}
+            </div>
+          )}
+
+          {/* 失败状态 */}
+          {status === 'failed' && (
+            <div className="placeholder-failed">
+              <div className="placeholder-error-icon">!</div>
+              <div className="placeholder-error-message">
+                {placeholder.errorMessage || '生成失败'}
+              </div>
+              {/* 操作按钮：选中失败占位符时显示 */}
+              {isSelected && (
+                <div className="placeholder-failed-actions">
+                  <button
+                    className="placeholder-action-btn placeholder-action-btn--retry"
+                    onClick={handleRetryClick}
+                    title="重新生成"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="23 4 23 10 17 10"/>
+                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    重试
+                  </button>
+                  <button
+                    className="placeholder-action-btn placeholder-action-btn--delete"
+                    onClick={handleDeleteClick}
+                    title="删除"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    删除
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 等待提交状态 */}
+          {status === 'pending' && (
+            <div className="placeholder-pending">
+              <span>等待提交</span>
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 };
@@ -629,10 +810,17 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   isGenerating,
   initialPlaceholder,
   onPlaceholderUpdate,
+  onPlaceholderStatusChange,
+  onPlaceholderSelect,
+  onPlaceholderDelete,
+  onPlaceholderRetry,
   projectId,
   tasks,
   onTaskRetry,
+  onTaskRedo,
   onTaskClick,
+  fillInputData,
+  onFillInput,
 }) => {
   const options: PlaitBoardOptions = {
     readonly: false,
@@ -657,6 +845,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   const boardRef = useRef<DrawnixBoard | null>(null);
   const [selectedImageUrls, setSelectedImageUrls] = useState<string[]>([]);
   const [placeholderInfo, setPlaceholderInfo] = useState<PlaceholderInfo | null>(null);
+  const [selectedPlaceholderId, setSelectedPlaceholderId] = useState<string | null>(null);
   // 记录上次占位符放置的位置（用于下次放置的参考）
   const lastPlaceholderPositionRef = useRef<{ x: number; y: number } | null>(null);
   const isInputFocusedRef = useRef(false);
@@ -734,8 +923,15 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     images: string[],
     options: ImageGenerateOptions
   ) => {
-    if (!board) return;
-    
+    console.log('[Placeholder] handleGenerateImageWithContext called', { value, images, options, board: !!board });
+
+    if (!board) {
+      console.log('[Placeholder] No board, returning');
+      return;
+    }
+
+    console.log('[Placeholder] Board exists, proceeding...');
+
     let width: number;
     let height: number;
     // 始终使用用户选择的目标比例，而不是输入图片的比例
@@ -772,23 +968,32 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     // 视口左上角在画布上的位置就是 viewport.origination
     const viewport = board.viewport;
     const zoom = viewport.zoom || 1;
-    const viewportWidth = window.innerWidth || 800;
-    const viewportHeight = window.innerHeight || 600;
-    
-    // 视口左上角坐标
+
+    // 使用 board 的容器尺寸
+    const container = document.querySelector('.drawnix-board');
+    const viewportWidth = container ? container.clientWidth : 800;
+    const viewportHeight = container ? container.clientHeight : 600;
+
+    // 视口左上角坐标（画布坐标）
     const origX = viewport.origination?.[0] || 0;
     const origY = viewport.origination?.[1] || 0;
-    
-    // 计算视口中心在画布坐标中的位置
-    // 屏幕像素转换为画布坐标需要除以 zoom
-    const centerX = origX + (viewportWidth / 2) / zoom;
-    const centerY = origY + (viewportHeight / 2) / zoom;
-    
+
+    // 视口中心在屏幕像素坐标中
+    const screenCenterX = viewportWidth / 2;
+    const screenCenterY = viewportHeight / 2;
+
+    // 转换为画布坐标（需要加上 origX/origY 并除以 zoom）
+    // 注意：Plait 的 viewport 坐标转换逻辑可能不同，这里使用更直接的方式
+    const centerX = origX + screenCenterX / zoom;
+    const centerY = origY + screenCenterY / zoom;
+
     // 视口边界（画布坐标）
     const viewportLeft = origX;
     const viewportTop = origY;
-    const viewportRight = origX + viewportWidth / zoom;
-    const viewportBottom = origY + viewportHeight / zoom;
+    const viewportRight = origX + (viewportWidth / zoom);
+    const viewportBottom = origY + (viewportHeight / zoom);
+
+    console.log('[Placeholder] Viewport:', { origX, origY, zoom, viewportWidth, viewportHeight, centerX, centerY, viewportLeft, viewportTop, viewportRight, viewportBottom });
     
     // 获取画布上所有元素，计算内容区域边界
     const allElements = board.children;
@@ -824,66 +1029,36 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     
     console.log('[Placeholder] Has content:', hasContent, 'Elements:', allElements.length);
     console.log('[Placeholder] Content center:', contentCenterX, contentCenterY);
-    
+
     // 找到视口内空白位置最大的地方
-    let finalX = contentCenterX - width / 2;
-    let finalY = contentCenterY - height / 2;
-    
-    // 生成候选位置：在视口内创建网格采样点
-    const candidates: { x: number; y: number; score: number }[] = [];
+    // 简化：直接使用视口中心（减去占位符尺寸的一半，使其居中）
+    // 避免复杂的位置计算导致问题
+    let finalX = centerX - width / 2;
+    let finalY = centerY - height / 2;
+
+    // 边距
     const margin = 20;
-    const gridSize = 5; // 5x5 网格
-    
-    for (let i = 0; i <= gridSize; i++) {
-      for (let j = 0; j <= gridSize; j++) {
-        const candidateX = viewportLeft + margin + (viewportRight - viewportLeft - 2 * margin) * (i / gridSize);
-        const candidateY = viewportTop + margin + (viewportBottom - viewportTop - 2 * margin) * (j / gridSize);
-        
-        // 检查这个位置是否被占用
-        if (!isPositionOccupied(board, candidateX, candidateY, width, height)) {
-          // 计算分数：离现有内容越远越好
-          let minDist = Infinity;
-          for (const element of allElements) {
-            const rect = board.getRectangle(element);
-            if (rect) {
-              const elemCenterX = rect.x + rect.width / 2;
-              const elemCenterY = rect.y + rect.height / 2;
-              const dist = Math.sqrt(
-                Math.pow(candidateX + width / 2 - elemCenterX, 2) +
-                Math.pow(candidateY + height / 2 - elemCenterY, 2)
-              );
-              minDist = Math.min(minDist, dist);
-            }
-          }
-          
-          candidates.push({
-            x: candidateX,
-            y: candidateY,
-            score: minDist
-          });
-        }
-      }
+
+    // 确保在视口内（给一点边距）
+    const minX = viewportLeft + margin;
+    const maxX = viewportRight - width - margin;
+    const minY = viewportTop + margin;
+    const maxY = viewportBottom - height - margin;
+
+    // 限制在视口范围内（确保 max >= min）
+    finalX = Math.max(minX, Math.min(finalX, Math.max(minX, maxX)));
+    finalY = Math.max(minY, Math.min(finalY, Math.max(minY, maxY)));
+
+    // 如果视口太小，给一个默认值
+    if (maxX < minX) {
+      finalX = viewportLeft + margin;
     }
-    
-    // 选择分数最高（离现有元素最远）的位置
-    if (candidates.length > 0) {
-      candidates.sort((a, b) => b.score - a.score);
-      finalX = candidates[0].x;
-      finalY = candidates[0].y;
-      console.log('[Placeholder] Best position found, score:', candidates[0].score);
-    } else {
-      // 没有找到空白位置，使用内容中心
-      console.log('[Placeholder] No empty position found, using content center');
+    if (maxY < minY) {
+      finalY = viewportTop + margin;
     }
-    
-    // 确保在视口内
-    if (finalX < viewportLeft + margin) finalX = viewportLeft + margin;
-    if (finalX + width > viewportRight - margin) finalX = viewportRight - margin - width;
-    if (finalY < viewportTop + margin) finalY = viewportTop + margin;
-    if (finalY + height > viewportBottom - margin) finalY = viewportBottom - margin - height;
-    
-    console.log('[Placeholder] Final position:', finalX, finalY);
-    
+
+    console.log('[Placeholder] Final position:', finalX, finalY, { centerX, centerY, viewportLeft, viewportTop, viewportRight, viewportBottom });
+
     // 创建占位块信息 - 只使用位置信息，不需要创建画布元素
     const placeholderId = generatePlaceholderId();
     const newPlaceholder: PlaceholderInfo = {
@@ -894,13 +1069,19 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       height,
       aspectRatio,
       placeholderElement: undefined, // 不再创建画布元素
+      status: 'generating', // 初始状态为生成中
+      prompt: value, // 保存用户输入的 prompt
+      startTime: Date.now(), // 记录开始时间
     };
-    
+
+    console.log('[Placeholder] Setting placeholder info:', newPlaceholder);
     setPlaceholderInfo(newPlaceholder);
+    console.log('[Placeholder] placeholderInfo set successfully');
   };
 
   // 处理图片生成完成 - 直接在占位符位置渲染图片
-  const handleImageGenerated = async (imageUrl: string, placeholderId?: string, taskId?: string) => {
+  // 返回插入的图片索引，用于后续更新
+  const handleImageGenerated = async (imageUrl: string, placeholderId?: string, taskId?: string): Promise<number | null> => {
     console.log('[Drawnix] handleImageGenerated called:', { imageUrl: imageUrl.substring(0, 50), placeholderId, taskId });
     
     // 如果传入了 placeholderId，查找对应的占位符信息
@@ -932,6 +1113,17 @@ export const Drawnix: React.FC<DrawnixProps> = ({
         // 设置初始透明度为0，用于渐显动画
         if (newImageElement) {
           const newIndex = board.children.length - 1;
+          // 保存任务ID和图片索引的映射关系，供后续更新使用
+          if (taskId) {
+            setTimeout(() => {
+              // 保存映射关系：taskId -> imageIndex
+              const existingMap = (board as any).__taskImageIndexMap || {};
+              existingMap[taskId] = newIndex;
+              (board as any).__taskImageIndexMap = existingMap;
+              console.log('[Drawnix] saved task-image mapping:', { taskId, imageIndex: newIndex });
+            }, 100);
+          }
+          
           Transforms.setNode(board, { opacity: 0 }, [newIndex]);
           
           // 渐显动画
@@ -951,6 +1143,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
           };
           
           requestAnimationFrame(fadeIn);
+          
+          // 返回图片索引
+          return newIndex;
         } else {
           setPlaceholderInfo(null);
         }
@@ -958,11 +1153,40 @@ export const Drawnix: React.FC<DrawnixProps> = ({
         console.error('Failed to render image on placeholder:', e);
       }
     }
+    return null;
+  };
+  
+  // 根据任务ID更新图片（用于将临时URL替换为永久Base64）
+  const updateImageByTaskId = async (taskId: string, newImageUrl: string): Promise<boolean> => {
+    if (!board) return false;
+    
+    const imageIndexMap = (board as any).__taskImageIndexMap || {};
+    const imageIndex = imageIndexMap[taskId];
+    
+    if (imageIndex === undefined) {
+      console.warn('[Drawnix] updateImageByTaskId: no image found for taskId:', taskId);
+      return false;
+    }
+    
+    try {
+      console.log('[Drawnix] updateImageByTaskId:', { taskId, imageIndex, newImageUrl: newImageUrl.substring(0, 50) });
+      Transforms.setNode(board, { url: newImageUrl }, [imageIndex]);
+      return true;
+    } catch (e) {
+      console.error('[Drawnix] updateImageByTaskId failed:', e);
+      return false;
+    }
   };
 
   // 处理占位符拖动移动
   const handlePlaceholderMove = (x: number, y: number) => {
     if (placeholderInfo) {
+      console.log('[Placeholder] move', {
+        id: placeholderInfo.id,
+        from: { x: placeholderInfo.x, y: placeholderInfo.y },
+        to: { x, y },
+        status: placeholderInfo.status,
+      });
       setPlaceholderInfo({
         ...placeholderInfo,
         x,
@@ -971,10 +1195,73 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     }
   };
 
-  // 暴露 handleImageGenerated 给外部
+  // 更新占位符状态（供外部调用）
+  const updatePlaceholderStatus = (status: 'pending' | 'generating' | 'completed' | 'failed', errorMessage?: string) => {
+    if (placeholderInfo) {
+      setPlaceholderInfo({
+        ...placeholderInfo,
+        status,
+        errorMessage,
+      });
+    }
+  };
+
+  // 清理占位符（供外部调用）
+  const clearPlaceholder = () => {
+    setPlaceholderInfo(null);
+    setSelectedPlaceholderId(null);
+  };
+
+  // 暴露 handleImageGenerated、updatePlaceholderStatus、clearPlaceholder 和 setInputValue 给外部
+  const setInputValue = (value: string) => {
+    // 找到 BottomInputBar 组件并触发更新
+    const input = document.querySelector('.bottom-input-bar textarea') as HTMLTextAreaElement;
+    if (input) {
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+
+  const setInputImages = (images: string[]) => {
+    setSelectedImageUrls(images);
+  };
+
+  // 监听 Board 点击事件，清除占位符选中状态
+  useEffect(() => {
+    if (!board) return;
+
+    const handleBoardClick = (e: MouseEvent) => {
+      // 点击画布空白处，清除占位符选中状态
+      if (selectedPlaceholderId) {
+        setSelectedPlaceholderId(null);
+      }
+    };
+
+    // 使用 setTimeout 确保 board 完全初始化后再添加监听器
+    const timer = setTimeout(() => {
+      const host = (board as any).host;
+      if (host) {
+        host.addEventListener('click', handleBoardClick);
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      const host = (board as any).host;
+      if (host) {
+        host.removeEventListener('click', handleBoardClick);
+      }
+    };
+  }, [board, selectedPlaceholderId]);
+
   useEffect(() => {
     if (board) {
       (board as any).handleImageGenerated = handleImageGenerated;
+      (board as any).updatePlaceholderStatus = updatePlaceholderStatus;
+      (board as any).clearPlaceholder = clearPlaceholder;
+      (board as any).setInputValue = setInputValue;
+      (board as any).setInputImages = setInputImages;
+      (board as any).updateImageByTaskId = updateImageByTaskId;
     }
   }, [board, placeholderInfo, onImageGenerated]);
 
@@ -1055,6 +1342,19 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                   viewportOrigX={viewportProps.origX}
                   viewportOrigY={viewportProps.origY}
                   onPlaceholderMove={handlePlaceholderMove}
+                  isSelected={selectedPlaceholderId === placeholderInfo.id}
+                  onSelect={(id) => {
+                    setSelectedPlaceholderId(id);
+                    onPlaceholderSelect?.(id);
+                  }}
+                  onDelete={(id) => {
+                    setSelectedPlaceholderId(null);
+                    onPlaceholderDelete?.(id);
+                  }}
+                  onRetry={(id) => {
+                    setSelectedPlaceholderId(null);
+                    onPlaceholderRetry?.(id);
+                  }}
                 />
               )}
               {tutorial &&
@@ -1091,6 +1391,11 @@ export const Drawnix: React.FC<DrawnixProps> = ({
               onGenerateImageWithContext={handleGenerateImageWithContext}
               imageGenerateOptions={imageGenerateOptions}
               isGenerating={isGenerating}
+              initialPrompt={fillInputData?.prompt}
+              initialImages={fillInputData?.images}
+              initialModel={fillInputData?.model}
+              initialAspectRatio={fillInputData?.aspectRatio}
+              initialImageSize={fillInputData?.imageSize}
             ></BottomInputBar>
           </Wrapper>
           <canvas className={`${LASER_POINTER_CLASS_NAME} mouse-course-hidden`}></canvas>

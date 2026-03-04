@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Drawnix, boardToImage, ImageGenerateOptions } from '@drawnix/drawnix';
+import { Drawnix, boardToImage, ImageGenerateOptions, PlaceholderInfo as DrawnixPlaceholderInfo } from '@drawnix/drawnix';
 import { PlaitBoard, PlaitElement, PlaitTheme, Viewport } from '@plait/core';
 import localforage from 'localforage';
 import LZString from 'lz-string';
@@ -7,7 +7,7 @@ import { ApiConfigModal, ApiConfig } from '../components/ApiConfigModal/ApiConfi
 import { ImageGeneratingPanel } from '../components/ImageGeneratingPanel/ImageGeneratingPanel';
 import CustomDropdown from '../components/CustomDropdown/CustomDropdown';
 import CardActionsDropdown from '../components/CardActionsDropdown/CardActionsDropdown';
-import { generateImage } from '../services/imageGeneration';
+import { generateImage, generateImageAsync, waitForTaskComplete, urlToBase64 } from '../services/imageGeneration';
 import {
   createTask,
   updateTaskStatus,
@@ -15,6 +15,8 @@ import {
   getActiveTasks,
   getAllTasks,
   subscribeToTasks,
+  cancelTask,
+  isTaskCancelled,
   ImageTask,
   PlaceholderInfo,
 } from '../services/taskManager';
@@ -419,6 +421,14 @@ export function App() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [tasks, setTasks] = useState<ImageTask[]>([]);
+  // 用于填充输入栏的数据（重做功能）
+  const [fillInputData, setFillInputData] = useState<{
+    prompt: string;
+    images: string[];
+    model: string;
+    aspectRatio: string;
+    imageSize?: string;
+  } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const boardRef = useRef<PlaitBoard | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -541,6 +551,19 @@ export function App() {
     await safeSetItem(API_CONFIG_KEY, config);
   };
 
+  // 规范化从 b64_json 获得的图片地址，避免重复 data: 前缀
+  const normalizeImageSrcFromB64 = (imageB64: string | undefined | null): string => {
+    if (!imageB64) return '';
+    const trimmed = imageB64.trim();
+    if (!trimmed) return '';
+    // 已经是 data URL，直接返回
+    if (trimmed.startsWith('data:image/')) {
+      return trimmed;
+    }
+    // 否则认为是裸 base64，补上前缀
+    return `data:image/png;base64,${trimmed}`;
+  };
+
   // 处理图片生成
   const handleGenerateImage = async (prompt: string, images: string[], options: ImageGenerateOptions) => {
     if (!apiConfig.apiKey || !apiConfig.baseUrl) {
@@ -584,7 +607,7 @@ export function App() {
     }
 
     // 创建占位符信息（使用默认位置，会在 Drawnix 组件中调整）
-    const placeholderInfo: PlaceholderInfo = {
+    const placeholderInfo: DrawnixPlaceholderInfo = {
       id: `placeholder-${Date.now()}`,
       x: 0,
       y: 0,
@@ -593,65 +616,256 @@ export function App() {
       aspectRatio,
     };
 
+    // 超时时间 1000 秒
+    const TIMEOUT_MS = 1000 * 1000;
+    const CHECK_INTERVAL_MS = 2000; // 每2秒检查一次
+
+    // 创建任务并持久化
+    const task = await createTask(
+      prompt,
+      options.model || 'nano-banana',
+      aspectRatio,
+      imageSize,
+      placeholderInfo,
+      currentProjectId,
+      images.length > 0 ? images : undefined
+    );
+    setCurrentTaskId(task.id);
+
+    // 更新任务状态为生成中
+    await updateTaskStatus(task.id, 'generating');
+
+    // 启动超时检测
+    const startTime = Date.now();
+    let isCancelled = false;
+
+    const checkTimeout = async (): Promise<string | null> => {
+      // 检查是否已取消
+      const cancelled = await isTaskCancelled(task.id);
+      if (cancelled) {
+        return '任务已取消';
+      }
+
+      // 检查是否超时
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        return '生成超时（已超过1000秒）';
+      }
+
+      return null;
+    };
+
+    // 启动定时检查
+    const checkInterval = setInterval(async () => {
+      const timeoutError = await checkTimeout();
+      if (timeoutError) {
+        clearInterval(checkInterval);
+        // 更新任务状态为失败
+        await updateTaskStatus(task.id, 'failed', undefined, timeoutError);
+
+        // 清理占位符
+        if (boardRef.current) {
+          const board = boardRef.current;
+          if ((board as any).clearPlaceholder) {
+            (board as any).clearPlaceholder();
+          }
+        }
+
+        setIsGenerating(false);
+        setCurrentTaskId(null);
+      }
+    }, CHECK_INTERVAL_MS);
+
     try {
-      // 创建任务并持久化
-      const task = await createTask(
-        prompt,
-        options.model || 'nano-banana',
-        aspectRatio,
-        imageSize,
-        placeholderInfo,
-        currentProjectId,
-        images.length > 0 ? images : undefined
-      );
-      setCurrentTaskId(task.id);
+      // 使用异步模式提交任务
+      console.log('[App][ImageGen] submit async task', {
+        localTaskId: task.id,
+        projectId: currentProjectId,
+        model: options.model,
+        aspectRatio: options.aspect_ratio,
+        imageSize: options.image_size,
+        hasRefImages: images.length > 0,
+      });
 
-      // 更新任务状态为生成中
-      await updateTaskStatus(task.id, 'generating');
+      // 更新任务状态为提交中
+      await updateTaskStatus(task.id, 'submitting');
 
-      const response = await generateImage({
+      // 如果是具体的 gemini 模型，image_size 已经包含在模型名中，不需要再传
+      const isSpecificGeminiModel = options.model?.startsWith('gemini-3.1-flash-image-preview-');
+      const taskResponse = await generateImageAsync({
         prompt,
         model: options.model,
         aspect_ratio: options.aspect_ratio,
-        image_size: options.image_size as '1K' | '2K' | '4K',
+        ...(isSpecificGeminiModel ? {} : { image_size: options.image_size as '1K' | '2K' | '4K' }),
         image: images.length > 0 ? images : undefined,
+        response_format: 'url', // 用 url 格式快速返回，图片会后台转换
       });
+
+      // 兼容两种返回格式：
+      // 1) 旧格式：{ code: 'success', data: 'task_id', message?: string }
+      // 2) 新格式：{ task_id: 'task_id' }
+      const hasSuccessCode =
+        taskResponse.code === 'success' || taskResponse.code === 'SUCCESS';
+      const hasTaskId =
+        !!(taskResponse as any).task_id || !!(taskResponse as any).data;
+
+      if (!hasSuccessCode && !hasTaskId) {
+        throw new Error(taskResponse.message || '提交任务失败');
+      }
+
+      const taskId =
+        (taskResponse as any).task_id || (taskResponse as any).data;
+      console.log('[App][ImageGen] async task accepted', { localTaskId: task.id, remoteTaskId: taskId });
+
+      // 更新任务状态为生成中（开始轮询）
+      await updateTaskStatus(task.id, 'generating');
+
+      // 轮询等待任务完成
+      const response = await waitForTaskComplete(
+        taskId,
+        (status, progress) => {
+          console.log('[App][ImageGen] remote task progress', { remoteTaskId: taskId, status, progress });
+        },
+        TIMEOUT_MS, // 与本地超时保持一致（1000秒）
+        3000 // 3秒轮询
+      );
+      console.log('[App][ImageGen] remote task done', { remoteTaskId: taskId, items: response?.data?.length });
+
+      // 清除超时检查
+      clearInterval(checkInterval);
+
+      // 检查是否被取消
+      const cancelled = await isTaskCancelled(task.id);
+      if (cancelled) {
+        // 清理占位符
+        if (boardRef.current) {
+          const board = boardRef.current;
+          if ((board as any).clearPlaceholder) {
+            (board as any).clearPlaceholder();
+          }
+        }
+        setIsGenerating(false);
+        setCurrentTaskId(null);
+        return;
+      }
 
       // 获取生成的图片URL或base64
       const imageUrl = response.data[0]?.url;
       const imageB64 = response.data[0]?.b64_json;
 
-      let imageSrc = imageUrl;
-      if (!imageSrc && imageB64) {
-        imageSrc = `data:image/png;base64,${imageB64}`;
-      }
-
-      if (imageSrc) {
-        // 更新任务状态为完成
-        await updateTaskStatus(task.id, 'completed', imageSrc);
-
-        // 将生成的图片添加到画布
+      // 保存原始URL（用于下载）
+      const savedOriginalUrl = imageUrl || '';
+      
+      // 优先使用 URL 显示（快速），然后后台转 Base64 保存（永久）
+      if (imageUrl || imageB64) {
+        // 判断使用哪个作为显示源
+        let displayImageSrc: string;
+        let isPermanentBase64 = false;
+        
+        if (imageB64) {
+          // 有 base64，直接使用（已经是永久的）
+          displayImageSrc = normalizeImageSrcFromB64(imageB64);
+          isPermanentBase64 = true;
+        } else {
+          // 只有 URL，先用 URL 显示
+          displayImageSrc = imageUrl!;
+        }
+        
+        console.log('[App][ImageGen] got imageSrc', { localTaskId: task.id, preview: displayImageSrc.slice(0, 60), isPermanentBase64 });
+        
+        // 立即插入画布显示（不管 URL 还是 Base64）
         if (boardRef.current) {
           const board = boardRef.current;
-          if ((board as any).handleImageGenerated) {
-            // 传递占位符信息和任务ID
-            await (board as any).handleImageGenerated(imageSrc, placeholderInfo.id, task.id);
-          } else {
-            const { addImageFromUrl } = await import('@drawnix/drawnix');
-            await addImageFromUrl(board, imageSrc);
+          try {
+            let imageIndex: number | null = null;
+            if ((board as any).handleImageGenerated) {
+              console.log('[App][ImageGen] insert image via board.handleImageGenerated', { localTaskId: task.id });
+              // 传递占位符信息和任务ID，获取图片索引
+              imageIndex = await (board as any).handleImageGenerated(displayImageSrc, placeholderInfo.id, task.id);
+            } else {
+              console.log('[App][ImageGen] insert image via fallback addImageFromUrl', { localTaskId: task.id });
+              const { addImageFromUrl } = await import('@drawnix/drawnix');
+              await addImageFromUrl(board, displayImageSrc);
+            }
+            
+            // 如果还不是永久的 Base64，后台转换
+            if (!isPermanentBase64 && imageUrl) {
+              // 先用 URL 更新任务状态
+              await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
+              console.log('[App][ImageGen] task updated -> completed (with URL)', { localTaskId: task.id });
+              
+              // 后台转换 URL 为 Base64（不阻塞用户）
+              setTimeout(async () => {
+                try {
+                  console.log('[App][ImageGen] converting URL to Base64 in background...', { localTaskId: task.id });
+                  const permanentBase64 = await urlToBase64(imageUrl);
+                  console.log('[App][ImageGen] URL converted to Base64', { localTaskId: task.id, preview: permanentBase64.slice(0, 60) });
+                  
+                  // 更新任务为永久 Base64
+                  await updateTaskStatus(task.id, 'completed', permanentBase64, undefined, savedOriginalUrl);
+                  
+                  // 更新画布上的图片
+                  if (boardRef.current) {
+                    const boardForUpdate = boardRef.current;
+                    if ((boardForUpdate as any).updateImageByTaskId) {
+                      const updated = await (boardForUpdate as any).updateImageByTaskId(task.id, permanentBase64);
+                      console.log('[App][ImageGen] canvas image updated to Base64', { localTaskId: task.id, success: updated });
+                    }
+                  }
+                } catch (error) {
+                  console.error('[App][ImageGen] background URL to Base64 conversion failed', { localTaskId: task.id }, error);
+                  // 转换失败，保留 URL 版本
+                }
+              }, 100); // 稍微延迟，让前端先渲染出来
+            } else {
+              // 本身就是 Base64，直接更新任务
+              await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
+              console.log('[App][ImageGen] task updated -> completed (with Base64)', { localTaskId: task.id });
+            }
+          } catch (e) {
+            console.error('[App][ImageGen] insert image failed', { localTaskId: task.id }, e);
+            // 插入失败，回退逻辑
+            if (displayImageSrc) {
+              await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
+            }
           }
+        } else {
+          console.warn('[App][ImageGen] boardRef.current missing, cannot insert image', { localTaskId: task.id });
+          await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
         }
       } else {
-        await updateTaskStatus(task.id, 'failed', undefined, '未能获取生成的图片');
-        alert('未能获取生成的图片，请重试');
+        // 没有拿到任何图片（既没有 URL 也没有 Base64）
+        console.error('[App][ImageGen] SUCCESS but empty imageSrc', {
+          localTaskId: task.id,
+          remoteTaskId: taskId,
+          imageUrlExists: !!imageUrl,
+          imageB64Exists: !!imageB64,
+        });
+        // 清理占位符
+        if (boardRef.current) {
+          const board = boardRef.current;
+          if ((board as any).clearPlaceholder) {
+            (board as any).clearPlaceholder();
+          }
+        }
       }
     } catch (error) {
+      // 清除超时检查
+      clearInterval(checkInterval);
+
       console.error('Image generation failed:', error);
       const errorMessage = error instanceof Error ? error.message : '图片生成失败，请重试';
 
-      // 更新任务状态为失败
-      if (currentTaskId) {
-        await updateTaskStatus(currentTaskId, 'failed', undefined, errorMessage);
+      // 更新任务状态为失败（使用 task.id 而不是 currentTaskId）
+      if (task?.id) {
+        await updateTaskStatus(task.id, 'failed', undefined, errorMessage);
+      }
+
+      // 清理占位符
+      if (boardRef.current) {
+        const board = boardRef.current;
+        if ((board as any).clearPlaceholder) {
+          (board as any).clearPlaceholder();
+        }
       }
 
       alert(errorMessage);
@@ -783,17 +997,19 @@ export function App() {
         
         // Use boardToImage to generate thumbnail
         // Increased ratio to 0.5 for better quality, relies on compression to keep size down
-        const thumbnail = await boardToImage(board, { 
+        const thumbnail = (await boardToImage(board, { 
           ratio: 0.5,
           padding: 10
-        });
+        })) ?? undefined;
         
-        console.log('handleBack: thumbnail generated, length:', thumbnail.length);
-        console.log('handleBack: thumbnail data:', thumbnail.substring(0, 100));
+        if (thumbnail) {
+          console.log('handleBack: thumbnail generated, length:', thumbnail.length);
+          console.log('handleBack: thumbnail data:', thumbnail.substring(0, 100));
+        }
         
         const updatedProjects = projects.map(p => 
           p.id === currentProjectId 
-            ? { ...p, thumbnail, updatedAt: new Date().toISOString() }
+            ? { ...p, thumbnail: thumbnail ?? p.thumbnail, updatedAt: new Date().toISOString() }
             : p
         );
         setProjects(updatedProjects);
@@ -851,19 +1067,109 @@ export function App() {
     );
   };
 
+  // 处理任务重做（已完成任务填充回输入栏）
+  const handleTaskRedo = (task: ImageTask) => {
+    console.log('Redoing task - fill input:', task.id);
+    // 将原有参数填充到输入栏
+    setFillInputData({
+      prompt: task.prompt,
+      images: task.referenceImages || [],
+      model: task.model,
+      aspectRatio: task.aspectRatio,
+      imageSize: task.imageSize,
+    });
+  };
+
+  // 处理占位符选中
+  const handlePlaceholderSelect = (placeholderId: string) => {
+    console.log('Placeholder selected:', placeholderId);
+  };
+
+  // 处理占位符删除
+  const handlePlaceholderDelete = async (placeholderId: string) => {
+    console.log('Placeholder deleted:', placeholderId);
+    // 清理占位符
+    if (boardRef.current) {
+      const board = boardRef.current;
+      if ((board as any).clearPlaceholder) {
+        (board as any).clearPlaceholder();
+      }
+    }
+    // 如果有对应的任务，也删除任务
+    if (currentTaskId) {
+      await updateTaskStatus(currentTaskId, 'failed', undefined, '用户手动删除');
+      setIsGenerating(false);
+      setCurrentTaskId(null);
+    }
+  };
+
+  // 处理占位符重试
+  const handlePlaceholderRetry = (placeholderId: string) => {
+    console.log('Placeholder retry:', placeholderId);
+    // 清理当前占位符
+    if (boardRef.current) {
+      const board = boardRef.current;
+      if ((board as any).clearPlaceholder) {
+        (board as any).clearPlaceholder();
+      }
+    }
+    // 使用当前任务信息重新生成
+    if (activeTask) {
+      handleTaskRetry(activeTask);
+    }
+  };
+
   // 处理任务点击（跳转到对应占位符）
   const handleTaskClick = (task: ImageTask) => {
     console.log('Task clicked:', task.id);
-    // TODO: 可以实现跳转到对应占位符位置的逻辑
+  };
+
+  // 处理任务取消
+  const handleTaskCancel = async (task: ImageTask) => {
+    // 弹出确认对话框
+    const confirmed = window.confirm('确定要取消当前任务吗？取消后需要重新生成。');
+    if (!confirmed) return;
+
+    console.log('Cancelling task:', task.id);
+    // 清理占位符
+    if (boardRef.current) {
+      const board = boardRef.current;
+      if ((board as any).clearPlaceholder) {
+        (board as any).clearPlaceholder();
+      }
+    }
+    // 如果当前正在生成的任务被取消，重置状态
+    if (currentTaskId === task.id) {
+      setIsGenerating(false);
+      setCurrentTaskId(null);
+    }
   };
 
   // 页面加载时恢复任务
   const handleRestoreTasks = async () => {
     if (!currentProjectId) return;
-    const { getActiveTasks } = await import('../services/taskManager');
+    const { getActiveTasks, updateTaskStatus } = await import('../services/taskManager');
     const activeTasks = await getActiveTasks(currentProjectId);
     console.log('Restoring active tasks:', activeTasks.length);
-    // TODO: 可以在这里实现自动恢复未完成任务的逻辑
+
+    // 检查是否有正在生成的任务
+    const generatingTasks = activeTasks.filter(
+      t => t.status === 'generating' || t.status === 'submitting'
+    );
+
+    if (generatingTasks.length > 0) {
+      // 将这些任务标记为失败，因为页面刷新后无法恢复轮询
+      // 用户需要重新生成
+      for (const task of generatingTasks) {
+        await updateTaskStatus(
+          task.id,
+          'failed',
+          undefined,
+          '页面刷新，任务已中断，请重新生成'
+        );
+      }
+      console.log('Marked interrupted tasks as failed');
+    }
   };
 
   // 加载任务列表
@@ -982,16 +1288,16 @@ export function App() {
           }}
           headerRight={
             <div className="toolbar-header-right">
-              <TaskListButton
-                projectId={currentProjectId || ''}
-                onTaskRetry={handleTaskRetry}
-                onTaskClick={handleTaskClick}
-              />
             </div>
           }
           onBack={handleBack}
           tasks={tasks}
           onTaskClick={handleTaskClick}
+          onTaskRedo={handleTaskRedo}
+          onPlaceholderSelect={handlePlaceholderSelect}
+          onPlaceholderDelete={handlePlaceholderDelete}
+          onPlaceholderRetry={handlePlaceholderRetry}
+          fillInputData={fillInputData || undefined}
           headerLeft={
             <div className="canvas-header-left">
               <button className="canvas-back-btn" onClick={handleBack} title="Back to Home">
@@ -1022,6 +1328,15 @@ export function App() {
             </div>
           }
         />
+        <div className="canvas-page-header-right">
+          <TaskListButton
+            projectId={currentProjectId || ''}
+            onTaskRetry={handleTaskRetry}
+            onTaskRedo={handleTaskRedo}
+            onTaskClick={handleTaskClick}
+            onTaskCancel={handleTaskCancel}
+          />
+        </div>
       </div>
     </div>
   );

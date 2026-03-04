@@ -1,23 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './TaskNotificationPanel.scss';
+import TaskListIcon from './TaskListIcon';
 import {
   ImageTask,
   getAllTasks,
   deleteTask,
   clearFinishedTasks,
   subscribeToTasks,
+  cancelTask,
 } from '../../services/taskManager';
 
 export interface TaskNotificationPanelProps {
   projectId: string;
   onTaskRetry?: (task: ImageTask) => void;
+  onTaskRedo?: (task: ImageTask) => void;
   onTaskClick?: (task: ImageTask) => void;
+  onTaskCancel?: (task: ImageTask) => void;
 }
 
 export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
   projectId,
   onTaskRetry,
+  onTaskRedo,
   onTaskClick,
+  onTaskCancel,
 }) => {
   const [tasks, setTasks] = useState<ImageTask[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -56,6 +62,14 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
             <polyline points="12 6 12 12 16 14"/>
           </svg>
         );
+      case 'submitting':
+        return (
+          <svg className="task-status-icon task-status-icon--submitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        );
       case 'generating':
         return (
           <svg className="task-status-icon task-status-icon--generating" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -84,6 +98,8 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
     switch (status) {
       case 'pending':
         return '等待中';
+      case 'submitting':
+        return '提交中...';
       case 'generating':
         return '生成中...';
       case 'completed':
@@ -124,6 +140,27 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
     }
   };
 
+  const handleRedo = async (task: ImageTask, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onTaskRedo) {
+      onTaskRedo(task);
+    }
+  };
+
+  const handleCancel = async (task: ImageTask, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await cancelTask(task.id);
+    if (onTaskCancel) {
+      onTaskCancel(task);
+    }
+    const allTasks = await getAllTasks();
+    const projectTasks = allTasks.filter(t => t.projectId === projectId);
+    projectTasks.sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    setTasks(projectTasks);
+  };
+
   const handleDelete = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     await deleteTask(taskId);
@@ -145,7 +182,7 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
     setTasks(projectTasks);
   };
 
-  const activeCount = tasks.filter(t => t.status === 'pending' || t.status === 'generating').length;
+  const activeCount = tasks.filter(t => t.status === 'pending' || t.status === 'submitting' || t.status === 'generating').length;
   const failedCount = tasks.filter(t => t.status === 'failed').length;
   const completedCount = tasks.filter(t => t.status === 'completed').length;
 
@@ -156,12 +193,7 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="task-notification-panel__title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
+          <TaskListIcon size={18} />
           <span>任务列表</span>
           {activeCount > 0 && (
             <span className="task-notification-panel__badge">{activeCount}</span>
@@ -181,12 +213,7 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
         <div className="task-notification-panel__content">
           {tasks.length === 0 ? (
             <div className="task-notification-panel__empty">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
+              <TaskListIcon size={32} strokeWidth={1.5} />
               <span>暂无任务</span>
             </div>
           ) : (
@@ -202,6 +229,15 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
                   </div>
                   
                   <div className="task-item__info">
+                    {/* 完成时显示图片缩略图 */}
+                    {task.status === 'completed' && (task.resultImageUrl || task.originalUrl) && (
+                      <div className="task-item__thumbnail">
+                        <img
+                          src={task.resultImageUrl || task.originalUrl}
+                          alt="生成结果"
+                        />
+                      </div>
+                    )}
                     <div className="task-item__prompt">
                       {task.prompt.length > 30 ? `${task.prompt.substring(0, 30)}...` : task.prompt}
                     </div>
@@ -213,7 +249,7 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
                         {formatTimeAgo(task.createdAt)}
                       </span>
                     </div>
-                    
+
                     {task.status === 'failed' && task.error && (
                       <div className="task-item__error">
                         {task.error}
@@ -222,18 +258,30 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
                   </div>
 
                   <div className="task-item__actions">
-                    {task.status === 'generating' && (
-                      <div className="task-item__progress">
-                        <div className="task-item__progress-bar"></div>
-                      </div>
+                    {(task.status === 'generating' || task.status === 'submitting') && (
+                      <>
+                        <div className="task-item__progress">
+                          <div className="task-item__progress-bar"></div>
+                        </div>
+                        <button
+                          className="task-item__btn task-item__btn--cancel"
+                          onClick={(e) => handleCancel(task, e)}
+                          title="取消"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </>
                     )}
                     
                     {task.status === 'failed' && (
                       <>
                         <button 
-                          className="task-item__btn task-item__btn--retry"
-                          onClick={(e) => handleRetry(task, e)}
-                          title="重试"
+                          className="task-item__btn task-item__btn--redo"
+                          onClick={(e) => handleRedo(task, e)}
+                          title="重做"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="23 4 23 10 17 10"/>
@@ -254,11 +302,23 @@ export const TaskNotificationPanel: React.FC<TaskNotificationPanelProps> = ({
                     )}
                     
                     {task.status === 'completed' && (
-                      <div className="task-item__completed-icon">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                      </div>
+                      <>
+                        <button
+                          className="task-item__btn task-item__btn--redo"
+                          onClick={(e) => handleRedo(task, e)}
+                          title="重做"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                          </svg>
+                        </button>
+                        <div className="task-item__completed-icon">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>

@@ -45,15 +45,31 @@ export const withImagePlugin = (board: PlaitBoard) => {
     insertFragment(clipboardData, targetPoint, operationType);
   };
 
-  newBoard.drop = (event: DragEvent) => {
+  newBoard.drop = async (event: DragEvent) => {
     if (event.dataTransfer?.files?.length) {
-      const imageFile = event.dataTransfer.files[0];
-      if (isSupportedImageFileType(imageFile.type)) {
-        const point = toViewBoxPoint(
+      const imageFiles = Array.from(event.dataTransfer.files).filter((file) =>
+        isSupportedImageFileType(file.type)
+      );
+      if (imageFiles.length > 0) {
+        const basePoint = toViewBoxPoint(
           board,
           toHostPoint(board, event.x, event.y)
         );
-        insertImage(board, imageFile, point, true);
+        // 递归插入每张图片，带有偏移量避免重叠
+        const offsetGap = 30;
+        const insertNext = async (index: number) => {
+          if (index >= imageFiles.length) {
+            return;
+          }
+          const point: Point = [
+            basePoint[0] + index * offsetGap,
+            basePoint[1] + index * offsetGap,
+          ];
+          await insertImage(board, imageFiles[index], point, true);
+          // 递归插入下一张
+          await insertNext(index + 1);
+        };
+        await insertNext(0);
         return true;
       }
     }

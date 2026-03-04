@@ -9,6 +9,15 @@ interface ImageFile {
   id: string;
 }
 
+// 常用提示词类型
+interface SavedPrompt {
+  id: string;
+  text: string;
+}
+
+// localStorage key
+const STORAGE_KEY = 'saved-prompts';
+
 export interface BottomInputBarProps {
   placeholder?: string;
   onSubmit?: (value: string, images: string[]) => void;
@@ -28,6 +37,12 @@ export interface BottomInputBarProps {
   isGenerating?: boolean;
   // 消耗的 credits
   credits?: number;
+  // 初始值（用于重做功能）
+  initialPrompt?: string;
+  initialImages?: string[];
+  initialModel?: string;
+  initialAspectRatio?: string;
+  initialImageSize?: string;
 }
 
 // 图片生成选项
@@ -41,7 +56,7 @@ export interface ImageGenerateOptions {
 export const MODEL_OPTIONS = [
   { value: 'nano-banana', label: 'Nano Banana' },
   { value: 'nano-banana-pro', label: 'Nano Banana Pro' },
-  { value: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash' },
+  { value: 'gemini-3.1-flash-image-preview', label: 'Nano Banana 2' },
 ];
 
 // 尺寸选项
@@ -150,16 +165,26 @@ export const ASPECT_RATIO_OPTIONS = [
 ];
 
 // 模型映射：将前端选项映射到实际的模型
-// gemini-3.1-flash-image-preview - 不需要映射，所有尺寸都用同一个模型
+// gemini-3.1-flash-image-preview (Nano Banana 2) + 1K → gemini-3.1-flash-image-preview-512px
+// gemini-3.1-flash-image-preview (Nano Banana 2) + 2K → gemini-3.1-flash-image-preview-2k
+// gemini-3.1-flash-image-preview (Nano Banana 2) + 4K → gemini-3.1-flash-image-preview-4k
 // Nano Banana + 1K → nano-banana
 // Nano Banana + 4K → nano-banana-hd
 // Nano Banana Pro + 1K → nano-banana-2
 // Nano Banana Pro + 2K → nano-banana-2-2k
 // Nano Banana Pro + 4K → nano-banana-2-4k
 const mapToActualModel = (model: string, size: string): string => {
-  // gemini-3.1-flash-image-preview 不需要映射，直接返回
+  // 如果已经是具体的 gemini 模型，直接返回（不再映射）
+  if (model.startsWith('gemini-3.1-flash-image-preview-')) {
+    return model;
+  }
+  
+  // gemini-3.1-flash-image-preview 需要根据尺寸映射
   if (model === 'gemini-3.1-flash-image-preview') {
-    return 'gemini-3.1-flash-image-preview';
+    if (size === '1K') return 'gemini-3.1-flash-image-preview-512px';
+    if (size === '2K') return 'gemini-3.1-flash-image-preview-2k';
+    if (size === '4K') return 'gemini-3.1-flash-image-preview-4k';
+    return 'gemini-3.1-flash-image-preview-512px'; // 默认
   }
   
   if (model === 'nano-banana-pro') {
@@ -189,6 +214,11 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
   imageGenerateOptions,
   isGenerating = false,
   credits = 10,
+  initialPrompt,
+  initialImages,
+  initialModel,
+  initialAspectRatio,
+  initialImageSize,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [uploadedImages, setUploadedImages] = useState<ImageFile[]>([]);
@@ -198,9 +228,102 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const refImageInputRef = useRef<HTMLInputElement>(null);
   // 当前选择的模型（前端显示的）和尺寸
-  const [selectedModel, setSelectedModel] = useState('nano-banana-pro');
-  const [selectedSize, setSelectedSize] = useState('1K');
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState('1:1');
+  const [selectedModel, setSelectedModel] = useState(initialModel || 'nano-banana-pro');
+  const [selectedSize, setSelectedSize] = useState(initialImageSize || '1K');
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio || '1:1');
+
+  // 常用提示词相关状态
+  const [promptsMenuOpen, setPromptsMenuOpen] = useState(false);
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  const [newPromptText, setNewPromptText] = useState('');
+
+  // 从 localStorage 加载保存的提示词
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        setSavedPrompts(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('Failed to load saved prompts:', e);
+    }
+  }, []);
+
+  // 保存提示词到 localStorage
+  const savePromptsToStorage = (prompts: SavedPrompt[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
+    } catch (e) {
+      console.error('Failed to save prompts:', e);
+    }
+  };
+
+  // 添加新提示词
+  const handleAddPrompt = () => {
+    const text = newPromptText.trim();
+    if (!text) return;
+
+    const newPrompt: SavedPrompt = {
+      id: `prompt-${Date.now()}`,
+      text: text,
+    };
+    const updated = [...savedPrompts, newPrompt];
+    setSavedPrompts(updated);
+    savePromptsToStorage(updated);
+    setNewPromptText('');
+  };
+
+  // 删除提示词
+  const handleDeletePrompt = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = savedPrompts.filter(p => p.id !== id);
+    setSavedPrompts(updated);
+    savePromptsToStorage(updated);
+  };
+
+  // 点击提示词填充到输入框
+  const handleSelectPrompt = (text: string) => {
+    setInputValue(text);
+    setPromptsMenuOpen(false);
+  };
+
+  // 当 initialPrompt 变化时，自动填充输入框
+  useEffect(() => {
+    if (initialPrompt !== undefined) {
+      setInputValue(initialPrompt);
+    }
+  }, [initialPrompt]);
+
+  // 当 initialImages 变化时，自动填充图片列表
+  useEffect(() => {
+    if (initialImages && initialImages.length > 0) {
+      const imageFiles: ImageFile[] = initialImages.map((url, index) => ({
+        url,
+        name: `image_${index}`,
+        id: `generated_${index}`,
+      }));
+      setUploadedImages(imageFiles);
+    }
+  }, [initialImages]);
+
+  // 当初始模型/尺寸/比例变化时，更新选择状态
+  useEffect(() => {
+    if (initialModel) {
+      setSelectedModel(initialModel);
+    }
+  }, [initialModel]);
+
+  useEffect(() => {
+    if (initialImageSize) {
+      setSelectedSize(initialImageSize);
+    }
+  }, [initialImageSize]);
+
+  useEffect(() => {
+    if (initialAspectRatio) {
+      setSelectedAspectRatio(initialAspectRatio);
+    }
+  }, [initialAspectRatio]);
 
   // Nano Banana 不支持 2K 分辨率
   // gemini-3.1-flash-image-preview 支持所有尺寸
@@ -221,13 +344,14 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
       setModelDropdownOpen(false);
       setSizeDropdownOpen(false);
       setRatioDropdownOpen(false);
+      setPromptsMenuOpen(false);
     };
 
-    if (modelDropdownOpen || sizeDropdownOpen || ratioDropdownOpen) {
+    if (modelDropdownOpen || sizeDropdownOpen || ratioDropdownOpen || promptsMenuOpen) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [modelDropdownOpen, sizeDropdownOpen, ratioDropdownOpen]);
+  }, [modelDropdownOpen, sizeDropdownOpen, ratioDropdownOpen, promptsMenuOpen]);
 
   // 如果当前选中的是 Nano Banana + 2K，自动切换到 1K
   useEffect(() => {
@@ -304,10 +428,12 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
     if (submitValue && (onGenerateImage || onGenerateImageWithContext)) {
       // 根据选择的模型和尺寸，映射到实际的模型
       const actualModel = mapToActualModel(selectedModel, selectedSize);
+      // 如果是具体的 gemini 模型，image_size 已经包含在模型名中，不需要再传
+      const isSpecificGeminiModel = selectedModel.startsWith('gemini-3.1-flash-image-preview-');
       const options = {
         model: actualModel,
         aspect_ratio: selectedAspectRatio,
-        image_size: selectedSize,
+        ...(isSpecificGeminiModel ? {} : { image_size: selectedSize }),
       };
       
       // 先调用带上下文的回调（用于创建占位块）
@@ -378,6 +504,111 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
     return closestRatio;
   };
 
+  // 统一的图片处理函数：压缩图片并添加到上传列表
+  const processImageFile = (file: File, fileName?: string) => {
+    if (!file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const url = event.target?.result as string;
+
+      const img = new Image();
+      img.onload = async () => {
+        const closestRatio = findClosestAspectRatio(img.width, img.height);
+        setSelectedAspectRatio(closestRatio);
+
+        const maxSize = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round((height / width) * maxSize);
+            width = maxSize;
+          } else {
+            width = Math.round((width / height) * maxSize);
+            height = maxSize;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+          const newImage: ImageFile = {
+            id: `ref-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            url: compressedUrl,
+            name: fileName || file.name,
+          };
+          setUploadedImages(prev => [...prev, newImage]);
+        }
+      };
+      img.src = url;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 处理拖拽上传
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // 只有当鼠标离开整个容器时才取消拖拽状态
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+          processImageFile(file);
+        }
+      });
+    }
+  };
+
+  // 处理粘贴上传
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          processImageFile(file, `粘贴图片_${Date.now()}`);
+        }
+        break;
+      }
+    }
+  };
+
   const handleRefImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -385,28 +616,53 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
     // 只取第一张图片来匹配比例
     const file = files[0];
     if (!file.type.startsWith('image/')) return;
-    
+
+    // 使用 Canvas 压缩图片
     const reader = new FileReader();
     reader.onload = (event) => {
       const url = event.target?.result as string;
-      
-      // 创建 Image 对象获取尺寸
+
+      // 创建 Image 对象
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const closestRatio = findClosestAspectRatio(img.width, img.height);
         setSelectedAspectRatio(closestRatio);
-        
-        const newImage: ImageFile = {
-          id: `ref-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          url,
-          name: file.name,
-        };
-        setUploadedImages(prev => [...prev, newImage]);
+
+        // 压缩图片：限制最长边为 1024px，质量 0.8
+        const maxSize = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round((height / width) * maxSize);
+            width = maxSize;
+          } else {
+            width = Math.round((width / height) * maxSize);
+            height = maxSize;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+          const newImage: ImageFile = {
+            id: `ref-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            url: compressedUrl,
+            name: file.name,
+          };
+          setUploadedImages(prev => [...prev, newImage]);
+        }
       };
       img.src = url;
     };
     reader.readAsDataURL(file);
-    
+
     // 清空 input 以便下次选择相同文件
     e.target.value = '';
   };
@@ -437,7 +693,30 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
   const currentModelLabel = MODEL_OPTIONS.find(m => m.value === selectedModel)?.label || 'Nano Banana Pro';
 
   return (
-    <div className={classNames('bottom-input-bar', className)} onClick={(e) => stopPropagation && e.stopPropagation()}>
+    <div
+      className={classNames('bottom-input-bar', className, {
+        'bottom-input-bar--dragging': isDragging,
+      })}
+      onClick={(e) => stopPropagation && e.stopPropagation()}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* 拖拽时的覆盖层 */}
+      {isDragging && (
+        <div className="bottom-input-bar__drop-overlay">
+          <div className="bottom-input-bar__drop-overlay-content">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3" ry="3"/>
+              <path d="M12 8v8"/>
+              <path d="M8 12l4-4 4 4"/>
+            </svg>
+            <span>拖放图片到此处上传</span>
+            <span className="bottom-input-bar__drop-overlay-hint">支持拖入或粘贴图片</span>
+          </div>
+        </div>
+      )}
       {/* 主容器 */}
       <div className="bottom-input-bar__container">
         {/* 输入框上方的图片预览区域 - 选中的图片和上传的图片 */}
@@ -500,9 +779,88 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
               stopPropagation && e.stopPropagation();
               onBlur?.();
             }}
+            onPaste={handlePaste}
             placeholder={placeholder}
             rows={1}
           />
+
+          {/* 常用提示词按钮和菜单 */}
+          <div className="bottom-input-bar__prompts-container">
+            <button
+              type="button"
+              className="bottom-input-bar__prompts-trigger"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPromptsMenuOpen(!promptsMenuOpen);
+                setModelDropdownOpen(false);
+                setSizeDropdownOpen(false);
+                setRatioDropdownOpen(false);
+              }}
+              title="常用提示词"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5" r="2"/>
+                <circle cx="12" cy="12" r="2"/>
+                <circle cx="12" cy="19" r="2"/>
+              </svg>
+            </button>
+
+            {promptsMenuOpen && (
+              <div className="bottom-input-bar__prompts-menu" onClick={(e) => e.stopPropagation()}>
+                {/* 已保存的提示词列表 */}
+                {savedPrompts.length > 0 && (
+                  <div className="bottom-input-bar__prompts-list">
+                    {savedPrompts.map((prompt) => (
+                      <div
+                        key={prompt.id}
+                        className="bottom-input-bar__prompts-item"
+                        onClick={() => handleSelectPrompt(prompt.text)}
+                      >
+                        <span className="bottom-input-bar__prompts-item-text">{prompt.text}</span>
+                        <button
+                          type="button"
+                          className="bottom-input-bar__prompts-delete"
+                          onClick={(e) => handleDeletePrompt(prompt.id, e)}
+                          title="删除"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 添加新提示词 */}
+                <div className="bottom-input-bar__prompts-add">
+                  <input
+                    type="text"
+                    className="bottom-input-bar__prompts-add-input"
+                    value={newPromptText}
+                    onChange={(e) => setNewPromptText(e.target.value)}
+                    placeholder="添加常用提示词..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddPrompt();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="bottom-input-bar__prompts-add-btn"
+                    onClick={handleAddPrompt}
+                    disabled={!newPromptText.trim()}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 底部工具栏 - 左右对齐 */}

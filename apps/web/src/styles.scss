@@ -87,7 +87,7 @@ body {
 
 @keyframes separate-fuse {
   0%, 100% { box-shadow: 0 0 0 0 var(--blob-color); }
-  50% { box-shadow: 60px -60px 0 -15px var(--blob-color), -60px 60px 0 -15px var(--blob-color); }
+  50% { box-shadow: 0 0 0 0 var(--blob-color); }
 }
 
 @keyframes color-breathe {
@@ -97,7 +97,7 @@ body {
 
 @keyframes breathing {
   0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.15; }
 }
 
 .blob {
@@ -116,8 +116,7 @@ body {
   background: #60A5FA;
   animation: liquid 14s ease-in-out infinite,
              separate-fuse 7s ease-in-out infinite,
-             color-breathe 10s ease-in-out infinite,
-             breathing 6s ease-in-out infinite;
+             color-breathe 10s ease-in-out infinite;
   --blob-color: #60A5FA;
 }
 
@@ -129,8 +128,7 @@ body {
   background: #818CF8;
   animation: liquid 14s ease-in-out infinite 3s,
              separate-fuse 7s ease-in-out infinite 3s,
-             color-breathe 10s ease-in-out infinite 3s,
-             breathing 6s ease-in-out infinite 3s;
+             color-breathe 10s ease-in-out infinite 3s;
   --blob-color: #818CF8;
 }
 
@@ -142,8 +140,7 @@ body {
   background: #C084FC;
   animation: liquid 14s ease-in-out infinite 6s,
              separate-fuse 7s ease-in-out infinite 6s,
-             color-breathe 10s ease-in-out infinite 6s,
-             breathing 6s ease-in-out infinite 6s;
+             color-breathe 10s ease-in-out infinite 6s;
   --blob-color: #C084FC;
 }
 
@@ -658,11 +655,14 @@ body {
   overflow: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  position: relative;
 
   &::-webkit-scrollbar {
     display: none;
   }
 }
+
+/* 画布页面右上角的任务列表按钮 - 移除外层容器，样式移至组件内部 */
 
 .canvas-header {
   height: 56px;
