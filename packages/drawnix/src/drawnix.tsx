@@ -26,6 +26,40 @@ import MobileDetect from 'mobile-detect';
 import { withMindExtend } from './plugins/with-mind-extend';
 import { clearCircularGroupReferences } from './plugins/with-common';
 
+import { withCommonPlugin } from './plugins/with-common';
+import { CreationToolbar } from './components/toolbar/creation-toolbar';
+import { ZoomToolbar } from './components/toolbar/zoom-toolbar';
+import { PopupToolbar } from './components/toolbar/popup-toolbar/popup-toolbar';
+import { SelectionToolbar } from './components/toolbar/selection-toolbar/selection-toolbar';
+import { AppToolbar } from './components/toolbar/app-toolbar/app-toolbar';
+import classNames from 'classnames';
+import './styles/index.scss';
+import { buildDrawnixHotkeyPlugin } from './plugins/with-hotkey';
+import { withFreehand } from './plugins/freehand/with-freehand';
+import { buildPencilPlugin } from './plugins/with-pencil';
+import {
+  DrawnixBoard,
+  DrawnixContext,
+  DrawnixState,
+} from './hooks/use-drawnix';
+import { ClosePencilToolbar } from './components/toolbar/pencil-mode-toolbar';
+import { TTDDialog } from './components/ttd-dialog/ttd-dialog';
+import { CleanConfirm } from './components/clean-confirm/clean-confirm';
+import { buildTextLinkPlugin } from './plugins/with-text-link';
+import { LinkPopup } from './components/popup/link-popup/link-popup';
+import { I18nProvider } from './i18n';
+import { Tutorial } from './components/tutorial';
+import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
+import { loadHTMLImageElement, buildImage } from './data/image';
+import { DataURL } from './types';
+import {
+  BottomInputBar,
+  type ImageGenerateOptions,
+  MODEL_OPTIONS,
+  ASPECT_RATIO_OPTIONS,
+  SIZE_OPTIONS,
+} from './components/bottom-input-bar/bottom-input-bar';
+
 // 创建一个空的 withGroup 插件来完全禁用 group 功能
 // 这样可以彻底解决智能拆图后删除图片的栈溢出问题
 const withGroup = (board: PlaitBoard): PlaitBoard => {
@@ -105,40 +139,6 @@ const withClearGroupIds = (board: PlaitBoard): PlaitBoard => {
   
   return board;
 };
-
-import { withCommonPlugin } from './plugins/with-common';
-import { CreationToolbar } from './components/toolbar/creation-toolbar';
-import { ZoomToolbar } from './components/toolbar/zoom-toolbar';
-import { PopupToolbar } from './components/toolbar/popup-toolbar/popup-toolbar';
-import { SelectionToolbar } from './components/toolbar/selection-toolbar/selection-toolbar';
-import { AppToolbar } from './components/toolbar/app-toolbar/app-toolbar';
-import classNames from 'classnames';
-import './styles/index.scss';
-import { buildDrawnixHotkeyPlugin } from './plugins/with-hotkey';
-import { withFreehand } from './plugins/freehand/with-freehand';
-import { buildPencilPlugin } from './plugins/with-pencil';
-import {
-  DrawnixBoard,
-  DrawnixContext,
-  DrawnixState,
-} from './hooks/use-drawnix';
-import { ClosePencilToolbar } from './components/toolbar/pencil-mode-toolbar';
-import { TTDDialog } from './components/ttd-dialog/ttd-dialog';
-import { CleanConfirm } from './components/clean-confirm/clean-confirm';
-import { buildTextLinkPlugin } from './plugins/with-text-link';
-import { LinkPopup } from './components/popup/link-popup/link-popup';
-import { I18nProvider } from './i18n';
-import { Tutorial } from './components/tutorial';
-import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
-import { loadHTMLImageElement, buildImage } from './data/image';
-import { DataURL } from './types';
-import {
-  BottomInputBar,
-  type ImageGenerateOptions,
-  MODEL_OPTIONS,
-  ASPECT_RATIO_OPTIONS,
-  SIZE_OPTIONS,
-} from './components/bottom-input-bar/bottom-input-bar';
 
 // Re-export for external use
 export {
@@ -419,7 +419,7 @@ const isPositionOccupied = (
   y: number,
   width: number,
   height: number,
-  margin: number = 20
+  margin = 20
 ): boolean => {
   const newRect = { x, y, width, height };
   
@@ -536,8 +536,8 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
       const zoom = screenPosition.zoom;
       const deltaX = (moveEvent.clientX - startX) / zoom;
       const deltaY = (moveEvent.clientY - startY) / zoom;
-      let newX = origElementX + deltaX;
-      let newY = origElementY + deltaY;
+      const newX = origElementX + deltaX;
+      const newY = origElementY + deltaY;
       
       // 移除旧的对齐线
       if (snapLinesG) {
@@ -610,7 +610,7 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
   };
   
   // 截断 prompt 显示
-  const truncatePrompt = (prompt?: string, maxLength: number = 50): string => {
+  const truncatePrompt = (prompt?: string, maxLength = 50): string => {
     if (!prompt) return '';
     if (prompt.length <= maxLength) return prompt;
     return prompt.substring(0, maxLength) + '...';
@@ -665,8 +665,7 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
   }, [status, placeholder.startTime]);
 
   return (
-    <>
-      <div
+    <div
         className={`image-placeholder ${isError ? 'placeholder-error' : ''} ${isSelected ? 'placeholder-selected' : ''}`}
         style={{
           position: 'absolute',
@@ -781,7 +780,6 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
           )}
         </div>
       </div>
-    </>
   );
 };
 
@@ -1085,7 +1083,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     console.log('[Drawnix] handleImageGenerated called:', { imageUrl: imageUrl.substring(0, 50), placeholderId, taskId });
     
     // 如果传入了 placeholderId，查找对应的占位符信息
-    let targetPlaceholder = placeholderInfo;
+    const targetPlaceholder = placeholderInfo;
     if (placeholderId && placeholderInfo && placeholderInfo.id !== placeholderId) {
       // 如果 ID 不匹配，可能需要从其他地方获取（暂时使用当前的 placeholderInfo）
       console.log('[Drawnix] placeholderId mismatch, using current placeholderInfo');
