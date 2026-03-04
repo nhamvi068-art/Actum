@@ -119,7 +119,7 @@ export async function clearThumbnails(): Promise<void> {
 /**
  * 清理旧的画布内容（保留最近 N 个）
  */
-export async function cleanOldBoardContent(keepCount: number = 5): Promise<void> {
+export async function cleanOldBoardContent(keepCount = 5): Promise<void> {
   try {
     const allKeys = await localforage.keys();
     const boardContentKeys = allKeys.filter(k => k.startsWith(MAIN_BOARD_CONTENT_KEY));

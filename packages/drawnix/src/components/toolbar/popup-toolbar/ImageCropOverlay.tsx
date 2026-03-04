@@ -127,7 +127,7 @@ export const ImageCropOverlay: React.FC<ImageCropOverlayProps> = ({
       const dxOriginal = dx;
       const dyOriginal = dy;
 
-      let currentBox = { ...dragRef.current.cropBox };
+      const currentBox = { ...dragRef.current.cropBox };
       const imgWidth = displayDimensions.width;
       const imgHeight = displayDimensions.height;
 
