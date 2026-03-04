@@ -202,7 +202,7 @@ const FreeCropEditor: React.FC<FreeCropEditorProps> = ({ imageUrl, onCropComplet
       const dxOriginal = dx / scale;
       const dyOriginal = dy / scale;
 
-      let newCropBox = { ...cropBox };
+      const newCropBox = { ...cropBox };
 
       switch (dragType) {
         case 'move':
