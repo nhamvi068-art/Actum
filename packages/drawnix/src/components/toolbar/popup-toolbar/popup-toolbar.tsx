@@ -23,6 +23,7 @@ import { useEffect, useRef } from 'react';
 import { useBoard, useListRender } from '@plait-board/react-board';
 import { flip, offset, useFloating } from '@floating-ui/react';
 import { Island } from '../../island';
+import { SelectionToolbar } from '../selection-toolbar/selection-toolbar';
 import classNames from 'classnames';
 import { useI18n } from '../../../i18n';
 import {
@@ -71,14 +72,27 @@ export const PopupToolbar = () => {
   // Check if selected element is an image
   const isImageSelected = selectedElements.length > 0 && selectedElements.every(PlaitDrawElement.isImage);
 
+  // Check if single text element is selected (let SelectionToolbar handle it)
+  const isSingleTextSelected =
+    selectedElements.length === 1 &&
+    (PlaitDrawElement.isText(selectedElements[0]) || MindElement.isMindElement(board, selectedElements[0]));
+
+  console.log('[PopupToolbar] isSingleTextSelected:', isSingleTextSelected, 'selectedElements:', selectedElements.map((e: any) => ({ id: e.id, type: e.type })));
+
   const open =
     selectedElements.length > 0 &&
     !isSelectionMoving(board) &&
-    !isImageSelected;
+    !isImageSelected &&
+    !isSingleTextSelected;
     
   // 图片选中时显示的一级工具栏
   const imageToolbarOpen = selectedElements.length > 0 && !isSelectionMoving(board) && isImageSelected;
-    
+
+  // 文本选中时显示的工具栏（使用和图片工具栏相同的定位逻辑）
+  const textToolbarOpen = isSingleTextSelected && !isSelectionMoving(board) && !movingOrDragging;
+
+  console.log('[PopupToolbar] textToolbarOpen:', textToolbarOpen, 'isSelectionMoving:', isSelectionMoving(board), 'movingOrDragging:', movingOrDragging);
+
   const { viewport, selection, children } = board;
   const { refs, floatingStyles } = useFloating({
     placement: 'top-start',
@@ -168,11 +182,13 @@ export const PopupToolbar = () => {
     }
   }, [viewport, selection, children, movingOrDragging]);
 
-  // Position image toolbar above the image
+  // Position image/text toolbar above the selected element
   const [toolbarPosition, setToolbarPosition] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
-    if (imageToolbarOpen && selectedElements.length > 0 && !movingOrDragging) {
+    const shouldOpen = imageToolbarOpen || textToolbarOpen;
+    console.log('[PopupToolbar] Position effect:', { shouldOpen, selectedElementsLength: selectedElements.length, movingOrDragging, textToolbarOpen });
+    if (shouldOpen && selectedElements.length > 0 && !movingOrDragging) {
       const elements = getSelectedElements(board);
       const rectangle = getRectangleByElements(board, elements, false);
       const [start, end] = RectangleClient.getPoints(rectangle);
@@ -186,14 +202,16 @@ export const PopupToolbar = () => {
       );
       const width = screenEnd[0] - screenStart[0];
       const height = screenEnd[1] - screenStart[1];
-      setToolbarPosition({
+      const newPosition = {
         left: screenStart[0] + width / 2,
         top: screenStart[1] - 60,
-      });
+      };
+      console.log('[PopupToolbar] Setting toolbarPosition:', newPosition);
+      setToolbarPosition(newPosition);
     } else {
       setToolbarPosition(null);
     }
-  }, [viewport, selection, children, movingOrDragging, imageToolbarOpen]);
+  }, [viewport, selection, children, movingOrDragging, imageToolbarOpen, textToolbarOpen]);
 
   useEffect(() => {
     movingOrDraggingRef.current = movingOrDragging;
@@ -426,6 +444,10 @@ export const PopupToolbar = () => {
             )}
           </Stack.Row>
         </Island>
+      )}
+      {/* Text toolbar - 文本工具栏 */}
+      {textToolbarOpen && !movingOrDragging && toolbarPosition && (
+        <SelectionToolbar position={toolbarPosition} externalPositioning />
       )}
       {/* Image toolbar - 一级工具栏（当二级工具栏未打开时显示） */}
       {imageToolbarOpen && !movingOrDragging && toolbarPosition && !layerMenuOpen && !sizeMenuOpen && (

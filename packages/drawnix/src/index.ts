@@ -2,3 +2,8 @@ export * from './drawnix';
 export * from './utils';
 export * from './i18n';
 export * from './components/icons';
+export * from './services';
+export * from './hooks/useWorkflowStatusSync';
+export * from './hooks/useAutoInsertToCanvas';
+export * from './hooks/useTaskQueue';
+export * from './ai-integration';

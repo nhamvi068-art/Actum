@@ -26,9 +26,10 @@ export const PopupBoldButton: React.FC<PopupBoldButtonProps> = (props) => {
                         bold: newBold,
                     },
                 };
-                Transforms.set(board, newElement, {
-                    at: [board.children.findIndex((child: any) => child.id === element.id)],
-                });
+                const index = board.children.findIndex((child: any) => child.id === element.id);
+                if (index >= 0) {
+                    Transforms.setNode(board, { textStyle: newElement.textStyle }, [index]);
+                }
             }
         });
     };

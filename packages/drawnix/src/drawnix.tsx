@@ -109,8 +109,8 @@ const withClearGroupIds = (board: PlaitBoard): PlaitBoard => {
 import { withCommonPlugin } from './plugins/with-common';
 import { CreationToolbar } from './components/toolbar/creation-toolbar';
 import { ZoomToolbar } from './components/toolbar/zoom-toolbar';
-import { PopupToolbar } from './components/toolbar/popup-toolbar/popup-toolbar';
 import { SelectionToolbar } from './components/toolbar/selection-toolbar/selection-toolbar';
+import { PopupToolbar } from './components/toolbar/popup-toolbar/popup-toolbar';
 import { AppToolbar } from './components/toolbar/app-toolbar/app-toolbar';
 import classNames from 'classnames';
 import './styles/index.scss';
@@ -230,6 +230,7 @@ export type DrawnixProps = {
   onPlaceholderSelect?: (placeholderId: string) => void;
   onPlaceholderDelete?: (placeholderId: string) => void;
   onPlaceholderRetry?: (placeholderId: string) => void;
+  onPlaceholderConfirmInsert?: (placeholderId: string, taskId?: string) => void;
   selectedPlaceholderId?: string | null;
   // 任务列表相关
   projectId?: string;
@@ -264,6 +265,12 @@ export interface PlaceholderInfo {
   errorMessage?: string; // 错误信息
   taskId?: string; // 关联的任务 ID
   startTime?: number; // 生成开始时间
+  progress?: number; // 进度百分比 0-100
+  // 种子卡片新增字段
+  model?: string; // 模型名称，如 "Nano Banana"
+  aspect_ratio?: string; // 比例字符串，如 "16:9"
+  image_size?: string; // 尺寸，如 "1K"
+  referenceImages?: string[]; // 参考图片
 }
 
 // 比例尺寸对照表 - 占位块的显示尺寸（像素）
@@ -459,6 +466,7 @@ interface PlaceholderOverlayProps {
   onSelect?: (placeholderId: string) => void;
   onDelete?: (placeholderId: string) => void;
   onRetry?: (placeholderId: string) => void;
+  onConfirmInsert?: (placeholderId: string, taskId?: string) => void;
 }
 
 // 加载动画覆盖层组件 - 优化版本，使用独立的视口属性避免不必要的重渲染
@@ -473,6 +481,7 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
   onSelect,
   onDelete,
   onRetry,
+  onConfirmInsert,
 }) => {
   const elementX = placeholder.x;
   const elementY = placeholder.y;
@@ -674,109 +683,153 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
           top: screenPosition.top,
           width: screenPosition.width,
           height: screenPosition.height,
-          overflow: 'hidden',
-          pointerEvents: 'auto',
-          cursor: 'grab',
-          background: isError ? '#fef2f2' : '#e5e7eb',
-          userSelect: 'none',
-          border: isSelected ? '2px solid #1890ff' : (isError ? '1px solid #fecaca' : '1px solid #e5e7eb'),
-          boxShadow: isSelected ? '0 0 0 2px rgba(24, 144, 255, 0.3)' : 'none',
+          overflow: 'visible',
+          pointerEvents: 'none',
           zIndex: 9999,
-          touchAction: 'none',
         }}
-        onPointerDown={handlePointerDown}
-        onClick={handleClick}
       >
-        {/* Simple Gradient Background */}
-        <div className="placeholder-gradient" />
-
-        {/* Multi-color Fluid Aura Animation for Generating Status */}
-        {(status === 'generating' || status === 'submitting' || status === 'pending') && (
-          <div className="placeholder-blob-container">
-            <div className="color-blob color-blob-1"></div>
-            <div className="color-blob color-blob-2"></div>
-            <div className="color-blob color-blob-3"></div>
-            <div className="water-drop"></div>
-          </div>
-        )}
-
-        {/* 状态显示层 - 仅报错时显示 */}
-        <div className={`Placeholder-status ${status === 'failed' ? 'is-error' : ''}`}>
-          {/* 提交中状态 */}
-          {status === 'submitting' && (
-            <div
-              className="placeholder-submitting"
-              style={{
-                transform: `scale(${screenPosition.zoom})`,
-                transformOrigin: 'bottom right'
-              }}
-            >
-              <div className="submitting-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
+        {/* 任务进度卡 - 统一布局 */}
+        <div
+          className={`task-progress-card ${isSelected ? 'task-progress-card--selected' : ''} ${isError ? 'task-progress-card--error' : ''}`}
+          style={{
+            pointerEvents: 'auto',
+            cursor: 'grab',
+            transform: `scale(${screenPosition.zoom})`,
+            transformOrigin: '0 0',
+          }}
+          onPointerDown={handlePointerDown}
+          onClick={handleClick}
+        >
+          {/* 第一行：图标容器 + 标题 + 状态徽章 + 删除按钮 */}
+          <div className="task-progress-card__header">
+            <div className="task-progress-card__title">
+              <div className={`task-progress-card__icon-wrapper task-progress-card__icon-wrapper--${status}`}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
                 </svg>
               </div>
-              <span>提交中...</span>
+              <span>图片生成</span>
             </div>
-          )}
-
-          {/* 生成中状态 */}
-          {status === 'generating' && (
-            <div
-              className="placeholder-generating"
-              style={{
-                transform: `scale(${screenPosition.zoom})`,
-                transformOrigin: 'bottom right'
-              }}
-            >
-              <div className="breathing-dot"></div>
-              {timeElapsed && <div className="placeholder-time">{timeElapsed}</div>}
-            </div>
-          )}
-
-          {/* 失败状态 */}
-          {status === 'failed' && (
-            <div className="placeholder-failed">
-              <div className="placeholder-error-icon">!</div>
-              <div className="placeholder-error-message">
-                {placeholder.errorMessage || '生成失败'}
+            <div className="task-progress-card__header-right">
+              <div className={`task-progress-card__status task-progress-card__status--${status}`}>
+                {status === 'submitting' && '提交中'}
+                {status === 'generating' && '执行中'}
+                {status === 'completed' && '已完成'}
+                {status === 'failed' && '失败'}
+                {status === 'pending' && '等待中'}
               </div>
-              {/* 操作按钮：选中失败占位符时显示 */}
-              {isSelected && (
-                <div className="placeholder-failed-actions">
-                  <button
-                    className="placeholder-action-btn placeholder-action-btn--retry"
-                    onClick={handleRetryClick}
-                    title="重新生成"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="23 4 23 10 17 10"/>
-                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                    </svg>
-                    重试
-                  </button>
-                  <button
-                    className="placeholder-action-btn placeholder-action-btn--delete"
-                    onClick={handleDeleteClick}
-                    title="删除"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"/>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                    删除
-                  </button>
-                </div>
-              )}
+              <button
+                className="task-progress-card__delete"
+                onClick={handleDeleteClick}
+                title="删除"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* 执行中/提交中 - 进度文字 + 进度条 */}
+          {(status === 'generating' || status === 'submitting') && (
+            <div className="task-progress-card__progress-section">
+              <div className="task-progress-card__progress-meta">
+                <span>{status === 'submitting' ? '步骤 1/1：提交任务...' : '步骤 1/1：正在生成...'}</span>
+                {timeElapsed && <span>{timeElapsed}</span>}
+              </div>
+              <div className="task-progress-card__progress-track">
+                <div
+                  className="task-progress-card__progress-fill"
+                  style={{ width: `${placeholder.progress && placeholder.progress > 0 ? placeholder.progress : 30}%` }}
+                />
+              </div>
             </div>
           )}
 
-          {/* 等待提交状态 */}
+          {/* 等待中 */}
           {status === 'pending' && (
-            <div className="placeholder-pending">
-              <span>等待提交</span>
+            <div className="task-progress-card__progress-section">
+              <div className="task-progress-card__progress-meta">
+                <span>等待提交...</span>
+              </div>
+              <div className="task-progress-card__progress-track">
+                <div className="task-progress-card__progress-fill" style={{ width: '5%' }} />
+              </div>
+            </div>
+          )}
+
+          {/* 失败 - 红色错误框 + 全宽重试按钮 */}
+          {status === 'failed' && (
+            <>
+              <div className="task-progress-card__error-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="task-progress-card__error-icon">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <div>
+                  <div className="task-progress-card__error-title">生成失败</div>
+                  {placeholder.errorMessage && (
+                    <div className="task-progress-card__error-msg">{placeholder.errorMessage}</div>
+                  )}
+                </div>
+              </div>
+              <button
+                className="task-progress-card__btn task-progress-card__btn--retry-full"
+                onClick={handleRetryClick}
+                title="重新生成"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                重新尝试
+              </button>
+            </>
+          )}
+
+          {/* 已完成 - 缩略图 + 耗时/尺寸 + 图标按钮 */}
+          {status === 'completed' && (
+            <div className="task-progress-card__completed-row">
+              <div className="task-progress-card__thumb">
+                {placeholder.imageUrl
+                  ? <img src={placeholder.imageUrl} alt="预览" />
+                  : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                }
+              </div>
+              <div className="task-progress-card__completed-meta">
+                {timeElapsed && <span>耗时 {timeElapsed}</span>}
+                <span>{placeholder.image_size || placeholder.aspectRatio || ''}</span>
+              </div>
+              <div className="task-progress-card__icon-btns">
+                <button
+                  className="task-progress-card__icon-btn"
+                  onClick={handleRetryClick}
+                  title="重新生成"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                  </svg>
+                </button>
+                <button
+                  className="task-progress-card__icon-btn task-progress-card__icon-btn--primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onConfirmInsert) {
+                      onConfirmInsert(placeholder.id, placeholder.taskId);
+                    }
+                  }}
+                  title="插入画布"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -814,6 +867,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   onPlaceholderSelect,
   onPlaceholderDelete,
   onPlaceholderRetry,
+  onPlaceholderConfirmInsert,
   projectId,
   tasks,
   onTaskRetry,
@@ -917,6 +971,95 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     // 不再恢复选中状态，避免闪动
   };
 
+  // 处理选区变化 - 用于图片点击回填功能
+  const handleSelectionChange = (selection: any) => {
+    if (!board) return;
+
+    const selectedElements = board.getSelectedElements();
+    if (selectedElements.length === 1) {
+      const selectedElement = selectedElements[0];
+      // 检查是否是图片元素
+      if (selectedElement.type === 'image') {
+        // 获取图片索引
+        const imageIndex = board.children.findIndex((el: any) => el.id === selectedElement.id);
+        if (imageIndex !== -1) {
+          // 从元数据映射中获取保存的参数
+          const metadataMap = (board as any).__imageMetadataMap || {};
+          const metadata = metadataMap[imageIndex];
+          if (metadata && onFillInput) {
+            console.log('[Drawnix] Image clicked, filling input:', metadata);
+            onFillInput({
+              prompt: metadata.prompt || '',
+              images: metadata.referenceImages || [],
+              model: metadata.model || 'nano-banana-pro',
+              aspectRatio: metadata.aspect_ratio || '1:1',
+              imageSize: metadata.image_size || '1K',
+            });
+          }
+        }
+      }
+    }
+  };
+
+  // 发射开始 - 创建飞向画布的光点动画
+  const handleSendStart = () => {
+    // 创建一个从底部输入框飞向画布中心的光点
+    const sendButton = document.querySelector('.bottom-input-bar .bottom-input-bar__action-btn') as HTMLElement;
+    const canvasContainer = document.querySelector('.plait-board-viewport') as HTMLElement;
+    
+    if (!sendButton || !canvasContainer) {
+      console.log('[SeedCard] Cannot find send button or canvas');
+      return;
+    }
+
+    // 获取发送按钮的位置
+    const buttonRect = sendButton.getBoundingClientRect();
+    const buttonCenterX = buttonRect.left + buttonRect.width / 2;
+    const buttonCenterY = buttonRect.top + buttonRect.height / 2;
+
+    // 获取画布中心位置
+    const canvasRect = canvasContainer.getBoundingClientRect();
+    const canvasCenterX = canvasRect.left + canvasRect.width / 2;
+    const canvasCenterY = canvasRect.top + canvasRect.height / 2;
+
+    // 创建光点元素
+    const lightOrb = document.createElement('div');
+    lightOrb.className = 'seed-card-launch-orb';
+    lightOrb.style.cssText = `
+      position: fixed;
+      left: ${buttonCenterX}px;
+      top: ${buttonCenterY}px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #3b82f6 0%, #60a5fa 50%, rgba(96, 165, 250, 0) 70%);
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.4);
+      pointer-events: none;
+      z-index: 10000;
+      transform: translate(-50%, -50%);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    `;
+
+    document.body.appendChild(lightOrb);
+
+    // 强制重绘后启动动画
+    requestAnimationFrame(() => {
+      lightOrb.style.left = `${canvasCenterX}px`;
+      lightOrb.style.top = `${canvasCenterY}px`;
+      lightOrb.style.opacity = '0';
+      lightOrb.style.transform = 'translate(-50%, -50%) scale(3)';
+    });
+
+    // 动画结束后移除元素
+    setTimeout(() => {
+      if (lightOrb.parentNode) {
+        lightOrb.parentNode.removeChild(lightOrb);
+      }
+    }, 500);
+
+    console.log('[SeedCard] Launch animation triggered from', { buttonCenterX, buttonCenterY }, 'to', { canvasCenterX, canvasCenterY });
+  };
+
   // 处理图片生成（带上下文）- 创建可拖拽的占位块
   const handleGenerateImageWithContext = async (
     value: string,
@@ -934,34 +1077,15 @@ export const Drawnix: React.FC<DrawnixProps> = ({
 
     let width: number;
     let height: number;
-    // 始终使用用户选择的目标比例，而不是输入图片的比例
+    // 使用固定的任务卡片尺寸（不再根据 imageSize 变化）
+    // 卡片尺寸约 180x130，与截图中的 UI 一致
+    const CARD_WIDTH = 180;
+    const CARD_HEIGHT = 130;
+    width = CARD_WIDTH;
+    height = CARD_HEIGHT;
+    // 保存用户选择的宽高比，用于最终图片生成
     const aspectRatio = options.aspect_ratio || '1:1';
-    // 获取用户选择的尺寸 (1K/2K/4K)
-    const imageSize = options.image_size || '1K';
-    
-    // 根据尺寸确定固定边长 (使用宽度作为基准)
-    // 1K: 宽度 200, 2K: 宽度 400, 4K: 宽度 800
-    const sizeBaseWidth: Record<string, number> = {
-      '1K': 200,
-      '2K': 400,
-      '4K': 800,
-    };
-    const baseWidth = sizeBaseWidth[imageSize] || 200;
-    
-    // 根据用户选择的目标比例计算高度
-    const [ratioW, ratioH] = aspectRatio.split(':').map(Number);
-    const ratio = ratioW / ratioH;
-    
-    if (ratio >= 1) {
-      // 横向比例或方形：宽度固定，高度按比例计算
-      width = baseWidth;
-      height = baseWidth / ratio;
-    } else {
-      // 竖向比例：高度固定，宽度按比例计算
-      height = baseWidth;
-      width = baseWidth * ratio;
-    }
-    
+
     // 如果有输入图片，记录下来用于生成时参考（但不改变占位符尺寸）
     
     // 简化：直接使用视口中心作为位置
@@ -1072,6 +1196,11 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       status: 'generating', // 初始状态为生成中
       prompt: value, // 保存用户输入的 prompt
       startTime: Date.now(), // 记录开始时间
+      // 种子卡片：保存完整的生成参数
+      model: options.model,
+      aspect_ratio: options.aspect_ratio,
+      image_size: options.image_size,
+      referenceImages: images,
     };
 
     console.log('[Placeholder] Setting placeholder info:', newPlaceholder);
@@ -1081,18 +1210,77 @@ export const Drawnix: React.FC<DrawnixProps> = ({
 
   // 处理图片生成完成 - 直接在占位符位置渲染图片
   // 返回插入的图片索引，用于后续更新
-  const handleImageGenerated = async (imageUrl: string, placeholderId?: string, taskId?: string): Promise<number | null> => {
-    console.log('[Drawnix] handleImageGenerated called:', { imageUrl: imageUrl.substring(0, 50), placeholderId, taskId });
-    
+  // fallbackBounds: 当没有占位符时使用的尺寸和位置信息
+  const handleImageGenerated = async (
+    imageUrl: string,
+    placeholderId?: string,
+    taskId?: string,
+    fallbackBounds?: { x?: number; y?: number; width: number; height: number; prompt?: string; model?: string; aspect_ratio?: string; image_size?: string; referenceImages?: string[] }
+  ): Promise<number | null> => {
+    console.log('[Drawnix] handleImageGenerated called:', { imageUrl: imageUrl.substring(0, 50), placeholderId, taskId, fallbackBounds });
+
     // 如果传入了 placeholderId，查找对应的占位符信息
     let targetPlaceholder = placeholderInfo;
     if (placeholderId && placeholderInfo && placeholderInfo.id !== placeholderId) {
       // 如果 ID 不匹配，可能需要从其他地方获取（暂时使用当前的 placeholderInfo）
       console.log('[Drawnix] placeholderId mismatch, using current placeholderInfo');
     }
-    
+
+    // 确定使用的尺寸和位置
+    let x: number, y: number, width: number, height: number;
+    let imageMetadata: any = {};
+
     if (targetPlaceholder && board) {
-      const { x, y, width, height } = targetPlaceholder;
+      // 使用占位符的位置和尺寸
+      x = targetPlaceholder.x;
+      y = targetPlaceholder.y;
+      width = targetPlaceholder.width;
+      height = targetPlaceholder.height;
+      imageMetadata = {
+        prompt: targetPlaceholder.prompt,
+        model: targetPlaceholder.model,
+        aspect_ratio: targetPlaceholder.aspect_ratio,
+        image_size: targetPlaceholder.image_size,
+        referenceImages: targetPlaceholder.referenceImages,
+      };
+    } else if (fallbackBounds && board) {
+      // 使用 fallbackBounds 的尺寸，位置用视口中心或 fallbackBounds 提供的坐标
+      width = fallbackBounds.width;
+      height = fallbackBounds.height;
+
+      if (fallbackBounds.x !== undefined && fallbackBounds.y !== undefined) {
+        x = fallbackBounds.x;
+        y = fallbackBounds.y;
+      } else {
+        // 使用视口中心作为默认位置
+        const viewport = board.viewport;
+        const zoom = viewport.zoom || 1;
+        const container = document.querySelector('.drawnix-board');
+        const viewportWidth = container ? container.clientWidth : 800;
+        const viewportHeight = container ? container.clientHeight : 600;
+        const origX = viewport.origination?.[0] || 0;
+        const origY = viewport.origination?.[1] || 0;
+        x = origX + (viewportWidth / 2) / zoom - width / 2;
+        y = origY + (viewportHeight / 2) / zoom - height / 2;
+      }
+
+      // 使用 fallbackBounds 提供的元数据
+      imageMetadata = {
+        prompt: fallbackBounds.prompt,
+        model: fallbackBounds.model,
+        aspect_ratio: fallbackBounds.aspect_ratio,
+        image_size: fallbackBounds.image_size,
+        referenceImages: fallbackBounds.referenceImages,
+      };
+
+      console.log('[Drawnix] Using fallbackBounds for image insertion:', { x, y, width, height });
+    } else {
+      // 没有占位符也没有 fallbackBounds，无法插入图片
+      console.warn('[Drawnix] handleImageGenerated: no placeholderInfo or fallbackBounds, cannot insert image');
+      return null;
+    }
+
+    if (board) {
       
       try {
         // 清除选中状态
@@ -1109,7 +1297,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
         
         // 获取刚插入的图片元素
         const newImageElement = board.children[board.children.length - 1];
-        
+
         // 设置初始透明度为0，用于渐显动画
         if (newImageElement) {
           const newIndex = board.children.length - 1;
@@ -1123,27 +1311,42 @@ export const Drawnix: React.FC<DrawnixProps> = ({
               console.log('[Drawnix] saved task-image mapping:', { taskId, imageIndex: newIndex });
             }, 100);
           }
-          
+
+          // 保存种子卡片的元数据到图片元素，供后续点击回填使用
+          if (Object.keys(imageMetadata).length > 0) {
+            // 将元数据保存到 board 的一个映射中
+            const existingMetadata = (board as any).__imageMetadataMap || {};
+            existingMetadata[newIndex] = imageMetadata;
+            (board as any).__imageMetadataMap = existingMetadata;
+            console.log('[Drawnix] saved image metadata:', imageMetadata);
+          }
+
+          // 种子卡片：增强的落位动画 - 从模糊到清晰 + 缩放
+          // 初始状态：缩放 0.8，透明度 0
           Transforms.setNode(board, { opacity: 0 }, [newIndex]);
-          
-          // 渐显动画
+
+          // 渐显 + 缩放动画
           let opacity = 0;
-          const fadeIn = () => {
-            opacity += 0.1;
+          let scale = 0.8;
+          const reveal = () => {
+            opacity += 0.05;
+            scale += 0.02;
             if (opacity >= 1) {
               opacity = 1;
+              scale = 1;
               Transforms.setNode(board, { opacity: 1 }, [newIndex]);
-              
+
               // 渐显完成后，清理占位符状态
               setPlaceholderInfo(null);
               return;
             }
+            // 应用缩放效果需要使用其他方法，这里只控制透明度
             Transforms.setNode(board, { opacity }, [newIndex]);
-            requestAnimationFrame(fadeIn);
+            requestAnimationFrame(reveal);
           };
-          
-          requestAnimationFrame(fadeIn);
-          
+
+          requestAnimationFrame(reveal);
+
           // 返回图片索引
           return newIndex;
         } else {
@@ -1196,12 +1399,25 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   };
 
   // 更新占位符状态（供外部调用）
-  const updatePlaceholderStatus = (status: 'pending' | 'generating' | 'completed' | 'failed', errorMessage?: string) => {
+  const updatePlaceholderStatus = (status: 'pending' | 'generating' | 'completed' | 'failed', errorMessage?: string, imageUrl?: string, taskId?: string) => {
     if (placeholderInfo) {
       setPlaceholderInfo({
         ...placeholderInfo,
         status,
         errorMessage,
+        imageUrl,
+        taskId,
+      });
+    }
+  };
+
+  // 更新占位符进度（供外部调用）- 种子卡片专用
+  const updatePlaceholderProgress = (progress: number) => {
+    if (placeholderInfo) {
+      setPlaceholderInfo({
+        ...placeholderInfo,
+        progress,
+        status: 'generating',
       });
     }
   };
@@ -1224,6 +1440,24 @@ export const Drawnix: React.FC<DrawnixProps> = ({
 
   const setInputImages = (images: string[]) => {
     setSelectedImageUrls(images);
+  };
+
+  // 聚焦到指定位置的占位符/种子卡片
+  const focusOnPlaceholder = (x: number, y: number, width: number, height: number) => {
+    if (!board) return;
+
+    // 计算目标视口中心
+    const zoom = board.viewport.zoom || 1;
+    const targetX = x + width / 2;
+    const targetY = y + height / 2;
+
+    // 设置新的视口中心，使用平滑过渡
+    board.setViewport({
+      zoom,
+      origination: [targetX, targetY],
+    });
+
+    console.log('[Drawnix] Focus on placeholder:', { x, y, width, height, targetX, targetY });
   };
 
   // 监听 Board 点击事件，清除占位符选中状态
@@ -1258,10 +1492,12 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     if (board) {
       (board as any).handleImageGenerated = handleImageGenerated;
       (board as any).updatePlaceholderStatus = updatePlaceholderStatus;
+      (board as any).updatePlaceholderProgress = updatePlaceholderProgress;
       (board as any).clearPlaceholder = clearPlaceholder;
       (board as any).setInputValue = setInputValue;
       (board as any).setInputImages = setInputImages;
       (board as any).updateImageByTaskId = updateImageByTaskId;
+      (board as any).focusOnPlaceholder = focusOnPlaceholder;
     }
   }, [board, placeholderInfo, onImageGenerated]);
 
@@ -1284,7 +1520,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             onChange={(data: BoardChangeData) => {
               onChange && onChange(data);
             }}
-            onSelectionChange={onSelectionChange}
+            onSelectionChange={handleSelectionChange}
             onViewportChange={onViewportChange}
             onThemeChange={onThemeChange}
             onValueChange={onValueChange}
@@ -1299,7 +1535,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                 const originalPointerMove = board.pointerMove.bind(board);
                 const originalPointerUp = board.pointerUp.bind(board);
                 const originalPointerDown = board.pointerDown.bind(board);
-                
+
                 board.pointerMove = (event: PointerEvent) => {
                   try {
                     originalPointerMove(event);
@@ -1307,7 +1543,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                     // Suppress errors from board pointerMove
                   }
                 };
-                
+
                 board.pointerUp = (event: PointerEvent) => {
                   try {
                     originalPointerUp(event);
@@ -1315,7 +1551,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                     // Suppress errors from board pointerUp
                   }
                 };
-                
+
                 board.pointerDown = (event: PointerEvent) => {
                   try {
                     originalPointerDown(event);
@@ -1355,6 +1591,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                     setSelectedPlaceholderId(null);
                     onPlaceholderRetry?.(id);
                   }}
+                  onConfirmInsert={(id, taskId) => {
+                    onPlaceholderConfirmInsert?.(id, taskId);
+                  }}
                 />
               )}
               {tutorial &&
@@ -1374,7 +1613,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             <CreationToolbar></CreationToolbar>
             <ZoomToolbar></ZoomToolbar>
             <PopupToolbar></PopupToolbar>
-            <SelectionToolbar></SelectionToolbar>
             <LinkPopup></LinkPopup>
             <ClosePencilToolbar></ClosePencilToolbar>
             <TTDDialog container={containerRef.current}></TTDDialog>
@@ -1389,6 +1627,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
               onSubmit={(value, images) => console.log('AI Submit:', { value, images })}
               onGenerateImage={onGenerateImage}
               onGenerateImageWithContext={handleGenerateImageWithContext}
+              onSendStart={handleSendStart}
               imageGenerateOptions={imageGenerateOptions}
               isGenerating={isGenerating}
               initialPrompt={fillInputData?.prompt}

@@ -256,8 +256,13 @@
     }
 }
 
-// 图片生成占位块样式
+// 图片生成占位块样式（外层容器 - 透明，仅用于定位）
 .image-placeholder {
+    // 外层容器透明，无背景无边框，仅用于定位
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+
     .placeholder-loading {
         display: flex;
         flex-direction: column;
@@ -663,6 +668,24 @@
         padding: 4px 8px;
         border-radius: 16px;
 
+        // 种子卡片：模型名称样式
+        .placeholder-model-name {
+            font-family: "SimHei", "Heiti SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            font-weight: 500;
+            font-size: 9px;
+            color: #ffffff;
+            letter-spacing: 0.2px;
+            line-height: 1;
+            background: rgba(59, 130, 246, 0.8);
+            padding: 3px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
         .breathing-dot {
             width: 6px;
             height: 6px;
@@ -679,6 +702,18 @@
             color: #ffffff;
             letter-spacing: 0.2px;
             line-height: 1;
+        }
+
+        .placeholder-progress {
+            font-family: "SimHei", "Heiti SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            font-weight: 600;
+            font-size: 10px;
+            color: #ffffff;
+            letter-spacing: 0.2px;
+            line-height: 1;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2px 6px;
+            border-radius: 8px;
         }
     }
 
@@ -751,20 +786,341 @@
         border-radius: 16px;
     }
 
-    // 错误状态样式
-    &.placeholder-error {
-        background: #fef2f2 !important;
-        border-color: #fecaca !important;
+    // ========== 任务进度卡样式 ==========
+    .task-progress-card {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 14px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        width: 220px;
+        border: 1px solid #f1f5f9;
+        transition: box-shadow 0.3s ease;
 
-        .placeholder-gradient {
-            display: none;
+        &:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+        }
+
+        // 第一行：标题 + 状态 + 删除
+        &__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        &__title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        // 图标容器（带状态颜色背景）
+        &__icon-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            flex-shrink: 0;
+
+            &--generating,
+            &--submitting {
+                background: #eff6ff;
+                color: #2563eb;
+            }
+
+            &--failed {
+                background: #f3f4f6;
+                color: #6b7280;
+            }
+
+            &--completed {
+                background: #f0fdf4;
+                color: #059669;
+            }
+
+            &--pending {
+                background: #f3f4f6;
+                color: #9ca3af;
+            }
+        }
+
+        // 头部右侧
+        &__header-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        // 状态徽章
+        &__status {
+            font-size: 10px;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 5px;
+            border: 1px solid transparent;
+
+            &--submitting {
+                background: #ede9fe;
+                color: #7c3aed;
+                border-color: rgba(124, 58, 237, 0.2);
+            }
+
+            &--generating {
+                background: #eff6ff;
+                color: #2563eb;
+                border-color: rgba(37, 99, 235, 0.2);
+            }
+
+            &--failed {
+                background: #fef2f2;
+                color: #dc2626;
+                border-color: rgba(220, 38, 38, 0.2);
+            }
+
+            &--pending {
+                background: #f3f4f6;
+                color: #6b7280;
+                border-color: rgba(107, 114, 128, 0.2);
+            }
+
+            &--completed {
+                background: #f0fdf4;
+                color: #059669;
+                border-color: rgba(5, 150, 105, 0.2);
+            }
+        }
+
+        // 删除按钮
+        &__delete {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: all 0.2s;
+
+            &:hover {
+                background: #fee2e2;
+                color: #ef4444;
+            }
+        }
+
+        // 执行中进度区域
+        &__progress-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        &__progress-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 500;
+
+            span:last-child {
+                color: #94a3b8;
+                font-variant-numeric: tabular-nums;
+            }
+        }
+
+        &__progress-track {
+            width: 100%;
+            height: 5px;
+            background: #f1f5f9;
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        &__progress-fill {
+            height: 100%;
+            background: #3b82f6;
+            border-radius: 99px;
+            background-image: linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.18) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.18) 50%,
+                rgba(255, 255, 255, 0.18) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 14px 14px;
+            animation: task-progress-stripes 0.8s linear infinite;
+            transition: width 0.4s ease;
+        }
+
+        // 错误框
+        &__error-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            background: #fef2f2;
+            border: 1px solid #fee2e2;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+
+        &__error-icon {
+            color: #ef4444;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        &__error-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #b91c1c;
+            margin-bottom: 2px;
+        }
+
+        &__error-msg {
+            font-size: 10px;
+            color: #dc2626;
+            opacity: 0.85;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+
+        // 按钮
+        &__btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 8px;
+            padding: 6px 10px;
+            border: 1px solid #e2e8f0;
+
+            &--retry-full {
+                width: 100%;
+                background: #ffffff;
+                color: #374151;
+                border-color: #e2e8f0;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+                &:hover {
+                    border-color: #3b82f6;
+                    color: #2563eb;
+                    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.12);
+                }
+
+                &:active {
+                    transform: scale(0.98);
+                }
+            }
+        }
+
+        // 完成行
+        &__completed-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        &__thumb {
+            width: 44px;
+            height: 44px;
+            border-radius: 7px;
+            overflow: hidden;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+
+            img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+        }
+
+        &__completed-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            font-size: 10px;
+            color: #64748b;
+            flex: 1;
+            min-width: 0;
+
+            span {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        }
+
+        &__icon-btns {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+
+        &__icon-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: none;
+            border-radius: 7px;
+            background: transparent;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: all 0.2s;
+
+            &:hover {
+                background: #f1f5f9;
+                color: #3b82f6;
+            }
+
+            &--primary {
+                color: #3b82f6;
+
+                &:hover {
+                    background: #eff6ff;
+                    color: #2563eb;
+                }
+            }
         }
     }
 
-    // 选中状态
-    &.placeholder-selected {
-        border-color: #1890ff !important;
-        box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.3) !important;
+    @keyframes task-progress-stripes {
+        from { background-position: 14px 0; }
+        to { background-position: 0 0; }
+    }
+
+    // 错误状态样式
+    &.placeholder-error {
+        .placeholder-gradient {
+            display: none;
+        }
     }
 
     // 失败状态操作按钮
@@ -819,5 +1175,32 @@
         .submitting-icon {
             animation: spin 1s linear infinite;
         }
+    }
+}
+
+// 种子卡片飞行动画 - 从底部输入框飞向画布中心的光点
+.seed-card-launch-orb {
+    &::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.3);
+        transform: translate(-50%, -50%);
+        animation: orb-pulse 1s ease-in-out infinite;
+    }
+}
+
+@keyframes orb-pulse {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.5;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0;
     }
 }

@@ -24,6 +24,8 @@ export interface BottomInputBarProps {
   onGenerateImage?: (value: string, images: string[], options: ImageGenerateOptions) => void;
   // 带上下文的图片生成回调，会传递比例信息用于创建占位块
   onGenerateImageWithContext?: (value: string, images: string[], options: ImageGenerateOptions) => void;
+  // 发射开始回调 - 点击发送按钮时触发，用于动画效果
+  onSendStart?: () => void;
   className?: string;
   // 支持多张引用图片
   imageUrls?: string[];
@@ -204,6 +206,7 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
   onSubmit,
   onGenerateImage,
   onGenerateImageWithContext,
+  onSendStart,
   className,
   imageUrls = [],
   onImagesClear,
@@ -287,15 +290,11 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
     setPromptsMenuOpen(false);
   };
 
-  // 当 initialPrompt 变化时，自动填充输入框
+  // 当任意初始值变化时，统一处理
   useEffect(() => {
     if (initialPrompt !== undefined) {
       setInputValue(initialPrompt);
     }
-  }, [initialPrompt]);
-
-  // 当 initialImages 变化时，自动填充图片列表
-  useEffect(() => {
     if (initialImages && initialImages.length > 0) {
       const imageFiles: ImageFile[] = initialImages.map((url, index) => ({
         url,
@@ -304,26 +303,16 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
       }));
       setUploadedImages(imageFiles);
     }
-  }, [initialImages]);
-
-  // 当初始模型/尺寸/比例变化时，更新选择状态
-  useEffect(() => {
     if (initialModel) {
       setSelectedModel(initialModel);
     }
-  }, [initialModel]);
-
-  useEffect(() => {
     if (initialImageSize) {
       setSelectedSize(initialImageSize);
     }
-  }, [initialImageSize]);
-
-  useEffect(() => {
     if (initialAspectRatio) {
       setSelectedAspectRatio(initialAspectRatio);
     }
-  }, [initialAspectRatio]);
+  }, [initialPrompt, initialImages, initialModel, initialImageSize, initialAspectRatio]);
 
   // Nano Banana 不支持 2K 分辨率
   // gemini-3.1-flash-image-preview 支持所有尺寸
@@ -426,6 +415,11 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
 
     let submitValue = inputValue.trim();
     if (submitValue && (onGenerateImage || onGenerateImageWithContext)) {
+      // 触发发射动画
+      if (onSendStart) {
+        onSendStart();
+      }
+      
       // 根据选择的模型和尺寸，映射到实际的模型
       const actualModel = mapToActualModel(selectedModel, selectedSize);
       // 如果是具体的 gemini 模型，image_size 已经包含在模型名中，不需要再传

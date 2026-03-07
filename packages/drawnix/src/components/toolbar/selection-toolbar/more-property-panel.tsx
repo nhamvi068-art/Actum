@@ -45,7 +45,7 @@ export const MorePropertyPanel: React.FC<MorePropertyPanelProps> = ({ element })
         };
         const index = board.children.findIndex((child: any) => child.id === element.id);
         if (index >= 0) {
-            Transforms.set(board, newElement, { at: [index] });
+            Transforms.setNode(board, { style: newElement.style }, [index]);
         }
     };
 

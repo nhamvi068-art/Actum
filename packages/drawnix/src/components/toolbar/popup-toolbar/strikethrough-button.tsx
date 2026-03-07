@@ -26,9 +26,10 @@ export const PopupStrikethroughButton: React.FC<PopupStrikethroughButtonProps> =
                         strikethrough: newStrikethrough,
                     },
                 };
-                Transforms.set(board, newElement, {
-                    at: [board.children.findIndex((child: any) => child.id === element.id)],
-                });
+                const index = board.children.findIndex((child: any) => child.id === element.id);
+                if (index >= 0) {
+                    Transforms.setNode(board, { textStyle: newElement.textStyle }, [index]);
+                }
             }
         });
     };

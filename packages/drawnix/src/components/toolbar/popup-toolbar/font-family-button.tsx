@@ -10,12 +10,16 @@ interface PopupFontFamilyButtonProps {
 
 // 可用字体列表
 const FONT_FAMILIES = [
+    { value: 'Inter', label: 'Inter' },
     { value: 'Arial', label: 'Arial' },
+    { value: 'Helvetica', label: 'Helvetica' },
+    { value: 'Verdana', label: 'Verdana' },
+    { value: 'Courier New', label: 'Courier New' },
     { value: 'Microsoft Yahei', label: '微软雅黑' },
+    { value: 'Microsoft YaHei', label: '微软雅黑 (YaHei)' },
     { value: 'SimSun', label: '宋体' },
     { value: 'SimHei', label: '黑体' },
     { value: 'PingFang SC', label: '苹方' },
-    { value: 'Helvetica', label: 'Helvetica' },
     { value: 'Georgia', label: 'Georgia' },
     { value: 'Times New Roman', label: 'Times New Roman' },
 ];
@@ -38,9 +42,10 @@ export const PopupFontFamilyButton: React.FC<PopupFontFamilyButtonProps> = (prop
                         fontFamily: family,
                     },
                 };
-                Transforms.set(board, newElement, {
-                    at: [board.children.findIndex((child: any) => child.id === element.id)],
-                });
+                const index = board.children.findIndex((child: any) => child.id === element.id);
+                if (index >= 0) {
+                    Transforms.setNode(board, { textStyle: newElement.textStyle }, [index]);
+                }
             }
         });
         setIsOpen(false);

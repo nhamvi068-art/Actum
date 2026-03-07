@@ -59,7 +59,7 @@ export const TextStylePanel: React.FC<TextStylePanelProps> = ({
         };
         const index = board.children.findIndex((child: any) => child.id === element.id);
         if (index >= 0) {
-            Transforms.set(board, newElement, { at: [index] });
+            Transforms.setNode(board, { textStyle: newElement.textStyle }, [index]);
         }
     };
 

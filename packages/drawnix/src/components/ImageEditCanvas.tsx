@@ -1121,6 +1121,28 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
     }));
   };
 
+  // 撤销操作
+  const handleUndo = useCallback(() => {
+    const prevState = undoImageEdit();
+    if (prevState) {
+      setEditState(prev => ({
+        ...prev,
+        ...prevState,
+      }));
+    }
+  }, []);
+
+  // 重做操作
+  const handleRedo = useCallback(() => {
+    const nextState = redoImageEdit();
+    if (nextState) {
+      setEditState(prev => ({
+        ...prev,
+        ...nextState,
+      }));
+    }
+  }, []);
+
   return (
     <div className="image-edit-full-container" ref={containerRef}>
       <div className="edit-sidebar">
@@ -1245,28 +1267,6 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
           </div>
         )}
       </div>
-
-  // 撤销操作
-  const handleUndo = useCallback(() => {
-    const prevState = undoImageEdit();
-    if (prevState) {
-      setEditState(prev => ({
-        ...prev,
-        ...prevState,
-      }));
-    }
-  }, []);
-
-  // 重做操作
-  const handleRedo = useCallback(() => {
-    const nextState = redoImageEdit();
-    if (nextState) {
-      setEditState(prev => ({
-        ...prev,
-        ...nextState,
-      }));
-    }
-  }, []);
 
       <div className="edit-main">
         <div className="top-toolbar">

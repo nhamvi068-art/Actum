@@ -14,7 +14,6 @@ import {
   incrementRetryCount,
   getActiveTasks,
   getAllTasks,
-  subscribeToTasks,
   cancelTask,
   isTaskCancelled,
   ImageTask,
@@ -30,6 +29,19 @@ import {
   cleanOldBoardContent,
   requestPersistentStorage,
 } from './utils/storage';
+import {
+  drawnixServices,
+  assetStorageService,
+  resourceManager,
+  storageMonitorService,
+  canvasService,
+  backupService,
+  taskStorageService,
+  useTaskQueue,
+} from '@drawnix/drawnix';
+
+// 用于追踪上一次保存的元素（用于计算增量）
+let previousElements: PlaitElement[] = [];
 
 type AppValue = {
   children: PlaitElement[];
@@ -404,6 +416,7 @@ function ProjectListView({
 
 export function App() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [value, setValue] = useState<AppValue>({ children: [] });
   const [tutorial, setTutorial] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -416,6 +429,7 @@ export function App() {
   const [currentPrompt, setCurrentPrompt] = useState('');
   const [currentModel, setCurrentModel] = useState('');
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [initialPlaceholder, setInitialPlaceholder] = useState<any>(null);
   const [activeTask, setActiveTask] = useState<ImageTask | null>(null);
   const [storageWarning, setStorageWarning] = useState<{ show: boolean; percentage: number } | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -429,6 +443,7 @@ export function App() {
     aspectRatio: string;
     imageSize?: string;
   } | null>(null);
+  const [isServicesReady, setIsServicesReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const boardRef = useRef<PlaitBoard | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -444,10 +459,47 @@ export function App() {
       requestPersistentStorage();
     };
     checkStorage();
+
+    // 初始化 drawnix 存储服务
+    const initDrawnixServices = async () => {
+      try {
+        await drawnixServices.init();
+        console.log('[App] Drawnix services initialized');
+
+        // 迁移旧任务数据从 localforage 到 IndexedDB
+        const { migrateFromLocalforage } = await import('../services/taskManager');
+        const migrated = await migrateFromLocalforage();
+        if (migrated > 0) {
+          console.log(`[App] Migrated ${migrated} tasks from localforage`);
+        }
+      } catch (error) {
+        console.error('[App] Failed to init drawnix services:', error);
+      } finally {
+        setIsServicesReady(true);
+      }
+    };
+    initDrawnixServices();
+
+    // 监听存储告警
+    const channel = new BroadcastChannel('drawnix_storage_alert');
+    channel.onmessage = (event) => {
+      if (event.data.type === 'STORAGE_ALERT') {
+        const alert = event.data.alert;
+        setStorageWarning({
+          show: true,
+          percentage: Math.round(alert.percentage * 100)
+        });
+      }
+    };
+
+    return () => {
+      channel.close();
+    };
   }, []);
 
   // 提取数据加载逻辑为独立的回调函数
   const loadData = useCallback(async () => {
+    setIsLoading(true);
     try {
       const storedProjects = (await safeGetItem<Project[]>(PROJECTS_KEY)) || (await localforage.getItem(PROJECTS_KEY)) as Project[] | null;
       if (storedProjects) {
@@ -462,41 +514,54 @@ export function App() {
 
       // 加载当前项目 ID（页面刷新后保持在画布页面）
       const storedProjectId = await safeGetItem<string>(CURRENT_PROJECT_ID_KEY);
-      if (storedProjectId) {
-        setCurrentProjectId(storedProjectId);
-        // 同时加载该项目的内容
-        const storedData = (await safeGetItem<AppValue>(
-          `${MAIN_BOARD_CONTENT_KEY}_${storedProjectId}`,
-          true
-        )) || (await localforage.getItem(
-          `${MAIN_BOARD_CONTENT_KEY}_${storedProjectId}`
-        )) as AppValue | null;
-        
-        if (storedData) {
-          setValue(storedData);
-          if (storedData.children && storedData.children.length === 0) {
-            setTutorial(true);
-          }
-          return;
+      const projectId = storedProjectId || currentProjectId;
+      if (projectId) {
+        if (storedProjectId) {
+          setCurrentProjectId(storedProjectId);
         }
-        setTutorial(true);
-        return;
-      }
 
-      if (currentProjectId) {
-        // 尝试解压缩读取，如果失败则使用原始数据
+        // 优先从 CanvasService（IndexedDB）加载，与 handleSelectProject 保持一致
+        try {
+          const fullData = await canvasService.getFullCanvas(projectId);
+          if (fullData.elements && fullData.elements.length > 0) {
+            setValue({
+              children: fullData.elements,
+              theme: fullData.theme,
+              viewport: fullData.viewport
+            });
+            previousElements = [...fullData.elements];
+            console.log('[App] Canvas loaded from CanvasService on refresh');
+            setIsLoading(false);
+            return;
+          } else if (fullData.theme || fullData.viewport) {
+            // 即使没有元素，也恢复 theme 和 viewport
+            setValue({
+              children: [],
+              theme: fullData.theme,
+              viewport: fullData.viewport
+            });
+            console.log('[App] Theme/viewport restored from CanvasService on refresh');
+            setIsLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('[App] Failed to load from CanvasService on refresh:', e);
+        }
+
+        // 降级到 localforage
         const storedData = (await safeGetItem<AppValue>(
-          `${MAIN_BOARD_CONTENT_KEY}_${currentProjectId}`,
+          `${MAIN_BOARD_CONTENT_KEY}_${projectId}`,
           true
         )) || (await localforage.getItem(
-          `${MAIN_BOARD_CONTENT_KEY}_${currentProjectId}`
+          `${MAIN_BOARD_CONTENT_KEY}_${projectId}`
         )) as AppValue | null;
-        
+
         if (storedData) {
           setValue(storedData);
           if (storedData.children && storedData.children.length === 0) {
             setTutorial(true);
           }
+          setIsLoading(false);
           return;
         }
         setTutorial(true);
@@ -504,11 +569,14 @@ export function App() {
     } catch (error) {
       console.error('Failed to load data:', error);
     }
+    setIsLoading(false);
   }, [currentProjectId]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (isServicesReady) {
+      loadData();
+    }
+  }, [isServicesReady, loadData]);
 
   // 页面加载时恢复活动任务
   useEffect(() => {
@@ -564,6 +632,26 @@ export function App() {
     return `data:image/png;base64,${trimmed}`;
   };
 
+  // ===== placeholder 操作辅助函数 =====
+  const updatePlaceholderStatus = (status: 'pending' | 'generating' | 'completed' | 'failed', errorMessage?: string, imageUrl?: string, taskId?: string) => {
+    if (boardRef.current && (boardRef.current as any).updatePlaceholderStatus) {
+      (boardRef.current as any).updatePlaceholderStatus(status, errorMessage, imageUrl, taskId);
+    }
+  };
+
+  const updatePlaceholderProgress = (progress: number) => {
+    if (boardRef.current && (boardRef.current as any).updatePlaceholderProgress) {
+      (boardRef.current as any).updatePlaceholderProgress(progress);
+    }
+  };
+
+  const clearPlaceholder = () => {
+    if (boardRef.current && (boardRef.current as any).clearPlaceholder) {
+      (boardRef.current as any).clearPlaceholder();
+    }
+  };
+  // ===== helper functions end =====
+
   // 处理图片生成
   const handleGenerateImage = async (prompt: string, images: string[], options: ImageGenerateOptions) => {
     if (!apiConfig.apiKey || !apiConfig.baseUrl) {
@@ -582,37 +670,17 @@ export function App() {
     setCurrentModel(options.model || 'nano-banana');
     setIsGenerating(true);
 
-    // 计算占位符位置和尺寸
-    let width: number;
-    let height: number;
+    // 创建占位符信息（使用固定卡片尺寸，与 Drawnix 保持一致）
+    const CARD_WIDTH = 180;
+    const CARD_HEIGHT = 130;
     const aspectRatio = options.aspect_ratio || '1:1';
     const imageSize = options.image_size || '1K';
-
-    const sizeBaseWidth: Record<string, number> = {
-      '1K': 200,
-      '2K': 400,
-      '4K': 800,
-    };
-    const baseWidth = sizeBaseWidth[imageSize] || 200;
-
-    const [ratioW, ratioH] = aspectRatio.split(':').map(Number);
-    const ratio = ratioW / ratioH;
-
-    if (ratio >= 1) {
-      width = baseWidth;
-      height = baseWidth / ratio;
-    } else {
-      height = baseWidth;
-      width = baseWidth * ratio;
-    }
-
-    // 创建占位符信息（使用默认位置，会在 Drawnix 组件中调整）
     const placeholderInfo: DrawnixPlaceholderInfo = {
       id: `placeholder-${Date.now()}`,
       x: 0,
       y: 0,
-      width,
-      height,
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
       aspectRatio,
     };
 
@@ -631,6 +699,9 @@ export function App() {
       images.length > 0 ? images : undefined
     );
     setCurrentTaskId(task.id);
+
+    // 更新占位符的 taskId
+    updatePlaceholderStatus('generating', undefined, undefined, task.id);
 
     // 更新任务状态为生成中
     await updateTaskStatus(task.id, 'generating');
@@ -662,14 +733,10 @@ export function App() {
         // 更新任务状态为失败
         await updateTaskStatus(task.id, 'failed', undefined, timeoutError);
 
-        // 清理占位符
-        if (boardRef.current) {
-          const board = boardRef.current;
-          if ((board as any).clearPlaceholder) {
-            (board as any).clearPlaceholder();
-          }
-        }
+        // 更新画布上的种子卡片状态为失败
+        updatePlaceholderStatus('failed', timeoutError);
 
+        // 不再自动清除占位符，让用户看到失败状态
         setIsGenerating(false);
         setCurrentTaskId(null);
       }
@@ -724,9 +791,12 @@ export function App() {
         taskId,
         (status, progress) => {
           console.log('[App][ImageGen] remote task progress', { remoteTaskId: taskId, status, progress });
+          // 更新画布上的种子卡片进度
+          updatePlaceholderProgress(progress);
         },
         TIMEOUT_MS, // 与本地超时保持一致（1000秒）
-        3000 // 3秒轮询
+        3000, // 3秒轮询
+        task.id // 传入本地任务ID用于更新 IndexedDB
       );
       console.log('[App][ImageGen] remote task done', { remoteTaskId: taskId, items: response?.data?.length });
 
@@ -737,12 +807,7 @@ export function App() {
       const cancelled = await isTaskCancelled(task.id);
       if (cancelled) {
         // 清理占位符
-        if (boardRef.current) {
-          const board = boardRef.current;
-          if ((board as any).clearPlaceholder) {
-            (board as any).clearPlaceholder();
-          }
-        }
+        clearPlaceholder();
         setIsGenerating(false);
         setCurrentTaskId(null);
         return;
@@ -771,67 +836,44 @@ export function App() {
         }
         
         console.log('[App][ImageGen] got imageSrc', { localTaskId: task.id, preview: displayImageSrc.slice(0, 60), isPermanentBase64 });
-        
-        // 立即插入画布显示（不管 URL 还是 Base64）
-        if (boardRef.current) {
-          const board = boardRef.current;
-          try {
-            let imageIndex: number | null = null;
-            if ((board as any).handleImageGenerated) {
-              console.log('[App][ImageGen] insert image via board.handleImageGenerated', { localTaskId: task.id });
-              // 传递占位符信息和任务ID，获取图片索引
-              imageIndex = await (board as any).handleImageGenerated(displayImageSrc, placeholderInfo.id, task.id);
-            } else {
-              console.log('[App][ImageGen] insert image via fallback addImageFromUrl', { localTaskId: task.id });
-              const { addImageFromUrl } = await import('@drawnix/drawnix');
-              await addImageFromUrl(board, displayImageSrc);
-            }
-            
-            // 如果还不是永久的 Base64，后台转换
-            if (!isPermanentBase64 && imageUrl) {
-              // 先用 URL 更新任务状态
-              await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
-              console.log('[App][ImageGen] task updated -> completed (with URL)', { localTaskId: task.id });
-              
-              // 后台转换 URL 为 Base64（不阻塞用户）
-              setTimeout(async () => {
-                try {
-                  console.log('[App][ImageGen] converting URL to Base64 in background...', { localTaskId: task.id });
-                  const permanentBase64 = await urlToBase64(imageUrl);
-                  console.log('[App][ImageGen] URL converted to Base64', { localTaskId: task.id, preview: permanentBase64.slice(0, 60) });
-                  
-                  // 更新任务为永久 Base64
-                  await updateTaskStatus(task.id, 'completed', permanentBase64, undefined, savedOriginalUrl);
-                  
-                  // 更新画布上的图片
-                  if (boardRef.current) {
-                    const boardForUpdate = boardRef.current;
-                    if ((boardForUpdate as any).updateImageByTaskId) {
-                      const updated = await (boardForUpdate as any).updateImageByTaskId(task.id, permanentBase64);
-                      console.log('[App][ImageGen] canvas image updated to Base64', { localTaskId: task.id, success: updated });
-                    }
-                  }
-                } catch (error) {
-                  console.error('[App][ImageGen] background URL to Base64 conversion failed', { localTaskId: task.id }, error);
-                  // 转换失败，保留 URL 版本
-                }
-              }, 100); // 稍微延迟，让前端先渲染出来
-            } else {
-              // 本身就是 Base64，直接更新任务
-              await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
-              console.log('[App][ImageGen] task updated -> completed (with Base64)', { localTaskId: task.id });
-            }
-          } catch (e) {
-            console.error('[App][ImageGen] insert image failed', { localTaskId: task.id }, e);
-            // 插入失败，回退逻辑
-            if (displayImageSrc) {
-              await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
-            }
-          }
-        } else {
-          console.warn('[App][ImageGen] boardRef.current missing, cannot insert image', { localTaskId: task.id });
+
+        // 不再自动插入画布，而是更新占位符为"已完成"状态，显示预览图
+        // 用户点击"确定"按钮后才插入画布
+
+        // 更新任务状态为 completed
+        if (!isPermanentBase64 && imageUrl) {
+          // 先用 URL 更新任务状态
           await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
+          console.log('[App][ImageGen] task updated -> completed (with URL)', { localTaskId: task.id });
+
+          // 后台转换 URL 为 Base64（不阻塞用户）
+          setTimeout(async () => {
+            try {
+              console.log('[App][ImageGen] converting URL to Base64 in background...', { localTaskId: task.id });
+              const permanentBase64 = await urlToBase64(imageUrl);
+              console.log('[App][ImageGen] URL converted to Base64', { localTaskId: task.id, preview: permanentBase64.slice(0, 60) });
+
+              // 更新任务为永久 Base64
+              await updateTaskStatus(task.id, 'completed', permanentBase64, undefined, savedOriginalUrl);
+              console.log('[App][ImageGen] task updated -> completed (with Base64)', { localTaskId: task.id });
+            } catch (error) {
+              console.error('[App][ImageGen] background URL to Base64 conversion failed', { localTaskId: task.id }, error);
+              // 转换失败，保留 URL 版本
+            }
+          }, 100);
+        } else {
+          // 本身就是 Base64，直接更新任务
+          await updateTaskStatus(task.id, 'completed', displayImageSrc, undefined, savedOriginalUrl);
+          console.log('[App][ImageGen] task updated -> completed (with Base64)', { localTaskId: task.id });
         }
+
+        // 更新占位符状态为已完成，并传入预览图
+        updatePlaceholderStatus('completed', undefined, displayImageSrc);
+        console.log('[App][ImageGen] placeholder updated to completed with preview', { localTaskId: task.id });
+
+        // 清理生成状态
+        setIsGenerating(false);
+        setCurrentTaskId(null);
       } else {
         // 没有拿到任何图片（既没有 URL 也没有 Base64）
         console.error('[App][ImageGen] SUCCESS but empty imageSrc', {
@@ -841,12 +883,7 @@ export function App() {
           imageB64Exists: !!imageB64,
         });
         // 清理占位符
-        if (boardRef.current) {
-          const board = boardRef.current;
-          if ((board as any).clearPlaceholder) {
-            (board as any).clearPlaceholder();
-          }
-        }
+        clearPlaceholder();
       }
     } catch (error) {
       // 清除超时检查
@@ -860,16 +897,10 @@ export function App() {
         await updateTaskStatus(task.id, 'failed', undefined, errorMessage);
       }
 
-      // 清理占位符
-      if (boardRef.current) {
-        const board = boardRef.current;
-        if ((board as any).clearPlaceholder) {
-          (board as any).clearPlaceholder();
-        }
-      }
+      // 更新画布上的种子卡片状态为失败
+      updatePlaceholderStatus('failed', errorMessage);
 
-      alert(errorMessage);
-    } finally {
+      // 不再自动清除占位符，让用户看到失败状态
       setIsGenerating(false);
       setCurrentTaskId(null);
     }
@@ -878,23 +909,48 @@ export function App() {
   const handleChange = (data: any) => {
     try {
       const children = Array.isArray(data) ? data : data.children;
+      const newTheme = data.theme !== undefined ? data.theme : value.theme;
+      const newViewport = data.viewport !== undefined ? data.viewport : value.viewport;
       const newAppValue: AppValue = {
         ...value,
         children,
-        theme: data.theme || value.theme
+        theme: newTheme,
+        viewport: newViewport
       };
       setValue(newAppValue);
       if (children && children.length > 0) {
         setTutorial(false);
       }
+
+      // 检测 theme 或 viewport 是否有变化
+      const themeChanged = newTheme !== value.theme;
+      const viewportChanged = JSON.stringify(newViewport) !== JSON.stringify(value.viewport);
+
       // Debounced save - only save after 1 second of inactivity
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
-      saveTimeoutRef.current = setTimeout(() => {
+
+      saveTimeoutRef.current = setTimeout(async () => {
         if (currentProjectId && !storageFailed) {
-          // 启用压缩存储，减少 30%-70% 存储体积
-          safeSetItem(`${MAIN_BOARD_CONTENT_KEY}_${currentProjectId}`, newAppValue, true);
+          // 优先使用新存储服务（CanvasService）
+          try {
+            // 计算增量并保存
+            const delta = canvasService.computeDelta(previousElements, children);
+            await canvasService.saveDelta(currentProjectId, delta);
+            previousElements = [...children];
+            console.log('[App] Canvas saved via CanvasService (delta mode)');
+
+            // 如果 theme 或 viewport 变化，单独保存
+            if (themeChanged || viewportChanged) {
+              await canvasService.saveThemeAndViewport(currentProjectId, newTheme, newViewport);
+              console.log('[App] Theme/viewport saved via CanvasService');
+            }
+          } catch (e) {
+            // 如果 CanvasService 失败，降级到 localforage
+            console.warn('[App] CanvasService failed, falling back to localforage:', e);
+            safeSetItem(`${MAIN_BOARD_CONTENT_KEY}_${currentProjectId}`, newAppValue, true);
+          }
         }
       }, 1000);
     } catch (error) {
@@ -921,16 +977,55 @@ export function App() {
   };
 
   const handleSelectProject = async (projectId: string) => {
+    // 切换项目时，释放之前项目的资源
+    if (currentProjectId) {
+      resourceManager.releaseAllForWorkspace(currentProjectId);
+    }
+
     setCurrentProjectId(projectId);
     await safeSetItem(CURRENT_PROJECT_ID_KEY, projectId);
+
+    // 尝试从 CanvasService 加载画布
+    try {
+      const fullData = await canvasService.getFullCanvas(projectId);
+      if (fullData.elements && fullData.elements.length > 0) {
+        setValue({
+          children: fullData.elements,
+          theme: fullData.theme,
+          viewport: fullData.viewport
+        });
+        previousElements = [...fullData.elements];
+        console.log('[App] Canvas loaded from CanvasService');
+        return;
+      } else if (fullData.theme || fullData.viewport) {
+        // 即使没有元素，也恢复 theme 和 viewport
+        setValue({
+          children: [],
+          theme: fullData.theme,
+          viewport: fullData.viewport
+        });
+        console.log('[App] Theme/viewport restored from CanvasService');
+        return;
+      }
+    } catch (e) {
+      console.warn('[App] Failed to load from CanvasService:', e);
+    }
+
+    // 降级到 localforage
+    // (后续可以在 loadData 中处理)
   };
 
   const handleDeleteProject = (projectId: string) => {
     const updatedProjects = projects.filter(p => p.id !== projectId);
     setProjects(updatedProjects);
     safeSetItem(PROJECTS_KEY, updatedProjects);
-      // Also delete the project content
-      localforage.removeItem(`${MAIN_BOARD_CONTENT_KEY}_${projectId}`);
+    // Also delete the project content
+    localforage.removeItem(`${MAIN_BOARD_CONTENT_KEY}_${projectId}`);
+
+    // 同时删除 Dexie 中的数据
+    canvasService.deleteWorkspace(projectId).catch(e => {
+      console.warn('[App] Failed to delete workspace from Dexie:', e);
+    });
   };
 
   const handleDuplicateProject = async (projectId: string) => {
@@ -1089,12 +1184,7 @@ export function App() {
   const handlePlaceholderDelete = async (placeholderId: string) => {
     console.log('Placeholder deleted:', placeholderId);
     // 清理占位符
-    if (boardRef.current) {
-      const board = boardRef.current;
-      if ((board as any).clearPlaceholder) {
-        (board as any).clearPlaceholder();
-      }
-    }
+    clearPlaceholder();
     // 如果有对应的任务，也删除任务
     if (currentTaskId) {
       await updateTaskStatus(currentTaskId, 'failed', undefined, '用户手动删除');
@@ -1103,25 +1193,93 @@ export function App() {
     }
   };
 
-  // 处理占位符重试
+  // 处理占位符重试 - 将原始参数填回输入框，让用户确认后重新生成
   const handlePlaceholderRetry = (placeholderId: string) => {
     console.log('Placeholder retry:', placeholderId);
-    // 清理当前占位符
+    // 清理当前占位符（删除卡片）
+    clearPlaceholder();
+    // 将原始参数填回输入框
+    if (activeTask) {
+      setFillInputData({
+        prompt: activeTask.prompt,
+        images: activeTask.referenceImages || [],
+        model: activeTask.model,
+        aspectRatio: activeTask.aspectRatio,
+        imageSize: activeTask.imageSize,
+      });
+    }
+  };
+
+  // 处理占位符确认插入（用户点击确定按钮）
+  const handlePlaceholderConfirmInsert = async (placeholderId: string, taskId?: string) => {
+    console.log('Placeholder confirm insert:', placeholderId, taskId);
+
+    // 找到对应的任务
+    const targetTaskId = taskId || currentTaskId;
+    if (!targetTaskId) {
+      console.warn('[App] No taskId for confirm insert');
+      return;
+    }
+
+    // 获取任务的 resultImageUrl
+    const task = await getTask(targetTaskId);
+    if (!task) {
+      console.warn('[App] Task not found for confirm insert:', targetTaskId);
+      return;
+    }
+
+    const imageUrl = task.resultImageUrl;
+    if (!imageUrl) {
+      console.warn('[App] No result image for confirm insert:', targetTaskId);
+      return;
+    }
+
+    // 插入图片到画布
     if (boardRef.current) {
       const board = boardRef.current;
-      if ((board as any).clearPlaceholder) {
-        (board as any).clearPlaceholder();
+      try {
+        if ((board as any).handleImageGenerated) {
+          console.log('[App] Confirm insert: inserting image to canvas', { taskId: targetTaskId });
+          await (board as any).handleImageGenerated(imageUrl, undefined, targetTaskId, task.placeholderInfo);
+          console.log('[App] Confirm insert: image inserted successfully');
+        } else {
+          console.warn('[App] Confirm insert: handleImageGenerated not available');
+        }
+      } catch (error) {
+        console.error('[App] Confirm insert failed:', error);
       }
     }
-    // 使用当前任务信息重新生成
-    if (activeTask) {
-      handleTaskRetry(activeTask);
+
+    // 清理占位符
+    clearPlaceholder();
+
+    // 可选：更新任务状态为已插入（或保持 completed）
+    // await updateTaskStatus(targetTaskId, 'completed', imageUrl);
+  };
+
+  // 处理占位符更新（同步 taskId）
+  const handlePlaceholderUpdate = (placeholderInfo: any) => {
+    console.log('[App] Placeholder updated:', placeholderInfo);
+    // 如果当前有任务 ID，更新占位符的 taskId
+    if (currentTaskId && placeholderInfo) {
+      // 这里可以通过更新任务来持久化占位符位置等信息
+      // 但当前任务 ID 已经在 handleGenerateImage 中创建任务时关联
     }
   };
 
   // 处理任务点击（跳转到对应占位符）
   const handleTaskClick = (task: ImageTask) => {
     console.log('Task clicked:', task.id);
+
+    // 如果任务有占位符信息，聚焦到画布上的对应位置
+    if (task.placeholderInfo && boardRef.current) {
+      const board = boardRef.current;
+      if ((board as any).focusOnPlaceholder) {
+        const { x, y, width, height } = task.placeholderInfo;
+        (board as any).focusOnPlaceholder(x, y, width, height);
+        console.log('[App] Focusing on task placeholder:', task.placeholderInfo);
+      }
+    }
   };
 
   // 处理任务取消
@@ -1132,12 +1290,7 @@ export function App() {
 
     console.log('Cancelling task:', task.id);
     // 清理占位符
-    if (boardRef.current) {
-      const board = boardRef.current;
-      if ((board as any).clearPlaceholder) {
-        (board as any).clearPlaceholder();
-      }
-    }
+    clearPlaceholder();
     // 如果当前正在生成的任务被取消，重置状态
     if (currentTaskId === task.id) {
       setIsGenerating(false);
@@ -1173,34 +1326,111 @@ export function App() {
   };
 
   // 加载任务列表
-  useEffect(() => {
-    if (!currentProjectId) return;
+  // 使用新的响应式 Hook 替代轮询
+  const { allTasks } = useTaskQueue();
+  
+  // 暂时禁用任务同步，避免无限循环
+  // TODO: 后续需要修复这个逻辑
+  // const prevTasksRef = useRef<string>('');
+  // useEffect(() => {
+  //   if (!currentProjectId || !allTasks) return;
+  //   
+  //   const projectTasks = allTasks
+  //     .filter(t => t.workspaceId === currentProjectId || (t as any).projectId === currentProjectId)
+  //     .map(t => ({
+  //       ...t,
+  //       projectId: t.workspaceId || (t as any).projectId || currentProjectId,
+  //       createdAt: new Date(t.createdAt).toISOString(),
+  //       updatedAt: new Date(t.updatedAt).toISOString(),
+  //       placeholderInfo: {
+  //         id: t.id,
+  //         x: 0,
+  //         y: 0,
+  //         width: 200,
+  //         height: 200,
+  //         aspectRatio: t.params?.aspect_ratio || '1:1'
+  //       }
+  //     })) as ImageTask[];
+  //   projectTasks.sort((a, b) => 
+  //     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  //   );
+  //   
+  //   const tasksJson = JSON.stringify(projectTasks.map(t => ({ id: t.id, status: t.status, updatedAt: t.updatedAt })));
+  //   
+  //   if (prevTasksRef.current !== tasksJson) {
+  //     prevTasksRef.current = tasksJson;
+  //     setTasks(projectTasks);
+  //   }
+  // }, [allTasks, currentProjectId]);
 
+  // 加载任务（仅用于初始加载）
+  useEffect(() => {
     const loadTasks = async () => {
-      const allTasks = await getAllTasks();
-      const projectTasks = allTasks.filter(t => t.projectId === currentProjectId);
-      projectTasks.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setTasks(projectTasks);
+      if (!currentProjectId) return;
+
+      try {
+        // 加载所有任务（包括失败和完成的任务），用于显示在任务列表中
+        const allProjectTasks = await getAllTasks();
+        const projectTasks = allProjectTasks.filter(t => t.projectId === currentProjectId);
+        // 按创建时间倒序排列，最新的在前
+        projectTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setTasks(projectTasks);
+
+        // 同时加载活动任务用于恢复
+        const activeTasks = await getActiveTasks(currentProjectId);
+        if (activeTasks.length > 0) {
+          console.log('[App] Found active tasks to restore:', activeTasks.length);
+          // 恢复最近的一个进行中的任务
+          const generatingTask = activeTasks.find(t => t.status === 'generating');
+          if (generatingTask) {
+            setActiveTask(generatingTask);
+            setCurrentPrompt(generatingTask.prompt);
+            setCurrentModel(generatingTask.model);
+            setIsGenerating(true);
+            setCurrentTaskId(generatingTask.id);
+          }
+        }
+
+        // 恢复已完成但未确认的任务（用于显示"待确认"卡片）
+        const allProjectTasksForRestore = await getAllTasks();
+        const completedTasks = allProjectTasksForRestore
+          .filter(t => t.projectId === currentProjectId && t.status === 'completed' && t.resultImageUrl)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        if (completedTasks.length > 0) {
+          console.log('[App] Found completed tasks to restore:', completedTasks.length);
+          // 恢复最近的一个已完成任务作为初始占位符
+          const latestCompletedTask = completedTasks[0];
+          setCurrentTaskId(latestCompletedTask.id);
+          setInitialPlaceholder({
+            ...latestCompletedTask.placeholderInfo,
+            status: 'completed',
+            imageUrl: latestCompletedTask.resultImageUrl,
+            taskId: latestCompletedTask.id,
+            prompt: latestCompletedTask.prompt,
+            model: latestCompletedTask.model,
+            aspect_ratio: latestCompletedTask.aspectRatio,
+            image_size: latestCompletedTask.imageSize,
+          });
+        }
+      } catch (error) {
+        console.error('[App] Failed to restore tasks:', error);
+      }
     };
 
     loadTasks();
-
-    const unsubscribe = subscribeToTasks((allTasks) => {
-      const projectTasks = allTasks.filter(t => t.projectId === currentProjectId);
-      projectTasks.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setTasks(projectTasks);
-    }, 2000);
-
-    return () => {
-      unsubscribe();
-    };
   }, [currentProjectId]);
 
   // Project list view
+  if (isLoading) {
+    return (
+      <div className="app-loading">
+        <div className="app-loading-spinner"></div>
+        <p>加载中...</p>
+      </div>
+    );
+  }
+
   if (!currentProjectId) {
     return (
       <>
@@ -1278,7 +1508,7 @@ export function App() {
           tutorial={tutorial}
           onGenerateImage={handleGenerateImage}
           isGenerating={isGenerating}
-          initialPlaceholder={activeTask?.placeholderInfo}
+          initialPlaceholder={initialPlaceholder}
           afterInit={(board) => {
             boardRef.current = board as PlaitBoard;
             console.log('Board initialized:', board);
@@ -1297,6 +1527,8 @@ export function App() {
           onPlaceholderSelect={handlePlaceholderSelect}
           onPlaceholderDelete={handlePlaceholderDelete}
           onPlaceholderRetry={handlePlaceholderRetry}
+          onPlaceholderConfirmInsert={handlePlaceholderConfirmInsert}
+          onPlaceholderUpdate={handlePlaceholderUpdate}
           fillInputData={fillInputData || undefined}
           headerLeft={
             <div className="canvas-header-left">
@@ -1331,10 +1563,8 @@ export function App() {
         <div className="canvas-page-header-right">
           <TaskListButton
             projectId={currentProjectId || ''}
-            onTaskRetry={handleTaskRetry}
             onTaskRedo={handleTaskRedo}
             onTaskClick={handleTaskClick}
-            onTaskCancel={handleTaskCancel}
           />
         </div>
       </div>

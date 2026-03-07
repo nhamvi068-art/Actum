@@ -1,4 +1,6 @@
-import localforage from 'localforage';
+import { db } from '@drawnix/drawnix';
+import { taskAssetManager } from '@drawnix/drawnix';
+import { liveQuery, Subscription } from 'dexie';
 
 // Task status enum
 export type TaskStatus = 'pending' | 'submitting' | 'generating' | 'completed' | 'failed';
@@ -14,7 +16,8 @@ export interface PlaceholderInfo {
   imageUrl?: string;
 }
 
-// Image task interface
+// Image task interface - extended for app usage
+// Note: This extends the basic TaskData in IndexedDB with additional fields
 export interface ImageTask {
   id: string;
   status: TaskStatus;
@@ -26,33 +29,47 @@ export interface ImageTask {
   placeholderInfo: PlaceholderInfo;
   resultImageUrl?: string; // Base64格式（用于画布显示）
   originalUrl?: string;   // 原始URL（用于下载）
+  localAssetId?: string;  // 本地缓存的资产 ID
   error?: string;
   retryCount: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string;  // ISO string for compatibility
+  updatedAt: string;  // ISO string for compatibility
   projectId: string;
+  workspaceId?: string;  // Alias for projectId (for TaskListButton compatibility)
   cancelled?: boolean; // 标记任务是否被取消
+  progress?: number; // 进度 0-100
 }
-
-// Storage key
-const TASKS_KEY = 'image_generation_tasks';
-
-// Configure localforage
-localforage.config({
-  name: 'Drawnix',
-  storeName: 'drawnix_store',
-});
 
 // Generate unique task ID
 export function generateTaskId(): string {
   return `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Get all tasks
+// Convert ImageTask to storable format (with workspaceId and numeric timestamps)
+function toStoredTask(task: ImageTask): any {
+  return {
+    ...task,
+    workspaceId: task.projectId,  // For TaskListButton filtering
+    createdAt: new Date(task.createdAt).getTime(),
+    updatedAt: new Date(task.updatedAt).getTime(),
+  };
+}
+
+// Convert stored task back to ImageTask format
+function fromStoredTask(task: any): ImageTask {
+  return {
+    ...task,
+    createdAt: new Date(task.createdAt).toISOString(),
+    updatedAt: new Date(task.updatedAt).toISOString(),
+    projectId: task.projectId || task.workspaceId,
+  };
+}
+
+// Get all tasks from IndexedDB
 export async function getAllTasks(): Promise<ImageTask[]> {
   try {
-    const tasks = await localforage.getItem<ImageTask[]>(TASKS_KEY);
-    return tasks || [];
+    const tasks = await db.tasks.orderBy('updatedAt').reverse().toArray();
+    return tasks.map(fromStoredTask);
   } catch (error) {
     console.error('Failed to get tasks:', error);
     return [];
@@ -61,8 +78,13 @@ export async function getAllTasks(): Promise<ImageTask[]> {
 
 // Get task by ID
 export async function getTaskById(taskId: string): Promise<ImageTask | null> {
-  const tasks = await getAllTasks();
-  return tasks.find(t => t.id === taskId) || null;
+  try {
+    const task = await db.tasks.get(taskId);
+    return task ? fromStoredTask(task) : null;
+  } catch (error) {
+    console.error('Failed to get task by ID:', error);
+    return null;
+  }
 }
 
 // Get tasks by project ID
@@ -77,15 +99,6 @@ export async function getTasksByStatus(status: TaskStatus): Promise<ImageTask[]>
   return tasks.filter(t => t.status === status);
 }
 
-// Save all tasks
-async function saveTasks(tasks: ImageTask[]): Promise<void> {
-  try {
-    await localforage.setItem(TASKS_KEY, tasks);
-  } catch (error) {
-    console.error('Failed to save tasks:', error);
-  }
-}
-
 // Create a new task
 export async function createTask(
   prompt: string,
@@ -96,8 +109,7 @@ export async function createTask(
   projectId: string,
   referenceImages?: string[]
 ): Promise<ImageTask> {
-  const tasks = await getAllTasks();
-  
+  const now = new Date().toISOString();
   const newTask: ImageTask = {
     id: generateTaskId(),
     status: 'pending',
@@ -108,14 +120,13 @@ export async function createTask(
     referenceImages,
     placeholderInfo,
     retryCount: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
     projectId,
+    workspaceId: projectId,
   };
-  
-  tasks.push(newTask);
-  await saveTasks(tasks);
-  
+
+  await db.tasks.add(toStoredTask(newTask));
   return newTask;
 }
 
@@ -127,35 +138,50 @@ export async function updateTaskStatus(
   error?: string,
   originalUrl?: string
 ): Promise<ImageTask | null> {
-  const tasks = await getAllTasks();
-  const taskIndex = tasks.findIndex(t => t.id === taskId);
-
-  if (taskIndex === -1) {
+  const task = await db.tasks.get(taskId);
+  if (!task) {
     return null;
   }
 
-  const task = tasks[taskIndex];
-  task.status = status;
-  task.updatedAt = new Date().toISOString();
+  const updatedData: any = {
+    status,
+    updatedAt: Date.now(),
+  };
 
   if (resultImageUrl) {
-    task.resultImageUrl = resultImageUrl;
-    task.placeholderInfo.imageUrl = resultImageUrl;
+    updatedData.resultImageUrl = resultImageUrl;
+    // Note: placeholderInfo update needs special handling
+
+    // Auto-cache image to IndexedDB (solve 404 issue)
+    try {
+      const assetId = await taskAssetManager.cacheTaskImage(
+        resultImageUrl,
+        task.projectId || task.workspaceId,
+        {
+          width: task.placeholderInfo?.width,
+          height: task.placeholderInfo?.height,
+          aspectRatio: task.placeholderInfo?.aspectRatio
+        }
+      );
+      if (assetId) {
+        updatedData.localAssetId = assetId;
+        console.log('[TaskManager] Image cached, assetId:', assetId);
+      }
+    } catch (cacheError) {
+      console.warn('[TaskManager] Failed to cache image:', cacheError);
+    }
   }
 
-  // 保存原始URL（用于下载）
   if (originalUrl) {
-    task.originalUrl = originalUrl;
+    updatedData.originalUrl = originalUrl;
   }
 
   if (error) {
-    task.error = error;
+    updatedData.error = error;
   }
 
-  tasks[taskIndex] = task;
-  await saveTasks(tasks);
-
-  return task;
+  await db.tasks.update(taskId, updatedData);
+  return fromStoredTask({ ...task, ...updatedData });
 }
 
 // Update task placeholder info
@@ -163,61 +189,50 @@ export async function updateTaskPlaceholder(
   taskId: string,
   placeholderInfo: PlaceholderInfo
 ): Promise<ImageTask | null> {
-  const tasks = await getAllTasks();
-  const taskIndex = tasks.findIndex(t => t.id === taskId);
-  
-  if (taskIndex === -1) {
+  const task = await db.tasks.get(taskId);
+  if (!task) {
     return null;
   }
-  
-  const task = tasks[taskIndex];
-  task.placeholderInfo = placeholderInfo;
-  task.updatedAt = new Date().toISOString();
-  
-  tasks[taskIndex] = task;
-  await saveTasks(tasks);
-  
-  return task;
+
+  await db.tasks.update(taskId, {
+    placeholderInfo,
+    updatedAt: Date.now(),
+  });
+
+  return fromStoredTask({ ...task, placeholderInfo });
 }
 
 // Increment retry count
 export async function incrementRetryCount(taskId: string): Promise<ImageTask | null> {
-  const tasks = await getAllTasks();
-  const taskIndex = tasks.findIndex(t => t.id === taskId);
-  
-  if (taskIndex === -1) {
+  const task = await db.tasks.get(taskId);
+  if (!task) {
     return null;
   }
-  
-  const task = tasks[taskIndex];
-  task.retryCount += 1;
-  task.updatedAt = new Date().toISOString();
-  
-  tasks[taskIndex] = task;
-  await saveTasks(tasks);
-  
-  return task;
+
+  const newRetryCount = (task.retryCount || 0) + 1;
+  await db.tasks.update(taskId, {
+    retryCount: newRetryCount,
+    updatedAt: Date.now(),
+  });
+
+  return fromStoredTask({ ...task, retryCount: newRetryCount });
 }
 
 // Cancel a task
 export async function cancelTask(taskId: string): Promise<ImageTask | null> {
-  const tasks = await getAllTasks();
-  const taskIndex = tasks.findIndex(t => t.id === taskId);
-  
-  if (taskIndex === -1) {
+  const task = await db.tasks.get(taskId);
+  if (!task) {
     return null;
   }
-  
-  const task = tasks[taskIndex];
-  task.cancelled = true;
-  task.status = 'failed';
-  task.error = '任务已取消';
-  task.updatedAt = new Date().toISOString();
-  
-  tasks[taskIndex] = task;
-  await saveTasks(tasks);
-  
-  return task;
+
+  await db.tasks.update(taskId, {
+    cancelled: true,
+    status: 'failed',
+    error: '任务已取消',
+    updatedAt: Date.now(),
+  });
+
+  return fromStoredTask({ ...task, cancelled: true, status: 'failed', error: '任务已取消' });
 }
 
 // Check if task is cancelled
@@ -228,36 +243,36 @@ export async function isTaskCancelled(taskId: string): Promise<boolean> {
 
 // Delete task
 export async function deleteTask(taskId: string): Promise<boolean> {
-  const tasks = await getAllTasks();
-  const filteredTasks = tasks.filter(t => t.id !== taskId);
-  
-  if (filteredTasks.length === tasks.length) {
+  try {
+    await db.tasks.delete(taskId);
+    return true;
+  } catch (error) {
+    console.error('Failed to delete task:', error);
     return false;
   }
-  
-  await saveTasks(filteredTasks);
-  return true;
 }
 
 // Clear completed and failed tasks
 export async function clearFinishedTasks(projectId?: string): Promise<number> {
-  const tasks = await getAllTasks();
-  const tasksToKeep = tasks.filter(t => {
+  const allTasks = await getAllTasks();
+  const tasksToDelete = allTasks.filter(t => {
     if (projectId && t.projectId !== projectId) {
-      return true;
+      return false;
     }
-    return t.status === 'pending' || t.status === 'generating';
+    return t.status === 'completed' || t.status === 'failed';
   });
-  
-  const clearedCount = tasks.length - tasksToKeep.length;
-  await saveTasks(tasksToKeep);
-  
-  return clearedCount;
+
+  if (tasksToDelete.length > 0) {
+    const ids = tasksToDelete.map(t => t.id);
+    await db.tasks.bulkDelete(ids);
+  }
+
+  return tasksToDelete.length;
 }
 
 // Clear all tasks
 export async function clearAllTasks(): Promise<void> {
-  await saveTasks([]);
+  await db.tasks.clear();
 }
 
 // Get pending/generating tasks (for recovery)
@@ -271,28 +286,85 @@ export async function getActiveTasks(projectId?: string): Promise<ImageTask[]> {
   });
 }
 
-// Subscribe to task changes (simple implementation using polling)
+// Update task progress
+export async function updateTaskProgress(taskId: string, progress: number): Promise<void> {
+  await db.tasks.update(taskId, {
+    progress: Math.min(100, Math.max(0, progress)),
+    updatedAt: Date.now(),
+  });
+}
+
+// Subscribe to task changes using Dexie liveQuery
 export function subscribeToTasks(
   callback: (tasks: ImageTask[]) => void,
   interval: number = 1000
 ): () => void {
-  let isActive = true;
-  
-  const poll = async () => {
-    if (!isActive) return;
-    const tasks = await getAllTasks();
-    callback(tasks);
-  };
-  
-  // Initial call
-  poll();
-  
-  // Set up interval
-  const intervalId = setInterval(poll, interval);
-  
+  let subscription: Subscription | null = null;
+
+  // Use liveQuery for reactive updates
+  try {
+    const observable = liveQuery(() =>
+      db.tasks.orderBy('updatedAt').reverse().toArray()
+    );
+
+    subscription = observable.subscribe({
+      next: (tasks: any[]) => {
+        const imageTasks = tasks.map(fromStoredTask);
+        callback(imageTasks);
+      },
+      error: (error: Error) => {
+        console.error('[subscribeToTasks] Error:', error);
+      },
+    });
+  } catch (error) {
+    console.error('[subscribeToTasks] Failed to subscribe:', error);
+    // Fallback to polling if liveQuery fails
+    const poll = async () => {
+      const tasks = await getAllTasks();
+      callback(tasks);
+    };
+    poll();
+    const intervalId = setInterval(poll, interval);
+    return () => clearInterval(intervalId);
+  }
+
   // Return cleanup function
   return () => {
-    isActive = false;
-    clearInterval(intervalId);
+    if (subscription) {
+      subscription.unsubscribe();
+    }
   };
+}
+
+// Migration function: import tasks from localforage to IndexedDB
+// Returns number of tasks migrated
+export async function migrateFromLocalforage(): Promise<number> {
+  const localforage = await import('localforage');
+  try {
+    const oldTasks = await localforage.getItem<ImageTask[]>('image_generation_tasks');
+    if (oldTasks && oldTasks.length > 0) {
+      console.log(`[TaskManager] Migrating ${oldTasks.length} tasks from localforage to IndexedDB`);
+
+      const tasksToAdd = oldTasks.map(t => ({
+        ...t,
+        workspaceId: t.projectId,
+        createdAt: new Date(t.createdAt).getTime(),
+        updatedAt: new Date(t.updatedAt).getTime(),
+      }));
+
+      await db.tasks.bulkPut(tasksToAdd);
+
+      // Verify migration
+      const count = await db.tasks.count();
+      console.log(`[TaskManager] Migration complete. Total tasks in IndexedDB: ${count}`);
+
+      // Optionally clear old localforage data
+      // await localforage.removeItem('image_generation_tasks');
+
+      return oldTasks.length;
+    }
+  } catch (error) {
+    console.error('[TaskManager] Migration failed:', error);
+  }
+  return 0;
 }

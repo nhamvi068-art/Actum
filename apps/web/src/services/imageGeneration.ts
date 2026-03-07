@@ -1,4 +1,5 @@
 import localforage from 'localforage';
+import { taskStorageService } from '@drawnix/drawnix';
 
 const API_CONFIG_KEY = 'api_config';
 
@@ -75,6 +76,30 @@ function buildApiUrl(baseUrl: string, endpoint: string): string {
   return `${url}${endpoint}`;
 }
 
+// ===== 内部辅助函数 =====
+
+// 构建请求头
+function buildRequestHeaders(apiKey: string): HeadersInit {
+  return {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+// 构建生图请求体
+function buildImageRequestBody(params: GenerateImageParams): object {
+  return {
+    model: params.model || 'nano-banana',
+    prompt: params.prompt,
+    aspect_ratio: params.aspect_ratio || '1:1',
+    response_format: params.response_format || 'url',
+    image_size: params.image_size,
+    image: params.image,
+  };
+}
+
+// ===== 内部辅助函数结束 =====
+
 // 验证 API 连接
 export async function validateApiConnection(): Promise<{ success: boolean; message: string; quota?: number }> {
   try {
@@ -83,10 +108,7 @@ export async function validateApiConnection(): Promise<{ success: boolean; messa
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: buildRequestHeaders(config.apiKey),
     });
 
     if (response.ok) {
@@ -116,22 +138,10 @@ export async function generateImage(params: GenerateImageParams): Promise<ImageG
   const config = await getApiConfig();
   const url = buildApiUrl(config.baseUrl, '/v1/images/generations');
 
-  const requestBody = {
-    model: params.model || 'nano-banana',
-    prompt: params.prompt,
-    aspect_ratio: params.aspect_ratio || '1:1',
-    response_format: params.response_format || 'url',
-    image_size: params.image_size,
-    image: params.image,
-  };
-
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
+    headers: buildRequestHeaders(config.apiKey),
+    body: JSON.stringify(buildImageRequestBody(params)),
   });
 
   if (!response.ok) {
@@ -153,22 +163,10 @@ export async function generateImageAsync(params: GenerateImageParams): Promise<A
   const config = await getApiConfig();
   const url = buildApiUrl(config.baseUrl, '/v1/images/generations?async=true');
 
-  const requestBody = {
-    model: params.model || 'nano-banana',
-    prompt: params.prompt,
-    aspect_ratio: params.aspect_ratio || '1:1',
-    response_format: params.response_format || 'url',
-    image_size: params.image_size,
-    image: params.image,
-  };
-
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
+    headers: buildRequestHeaders(config.apiKey),
+    body: JSON.stringify(buildImageRequestBody(params)),
   });
 
   if (!response.ok) {
@@ -186,10 +184,7 @@ export async function getTaskStatus(taskId: string): Promise<TaskStatusResponse>
 
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: buildRequestHeaders(config.apiKey),
   });
 
   if (!response.ok) {
@@ -204,7 +199,8 @@ export async function waitForTaskComplete(
   taskId: string,
   onProgress?: (status: string, progress: number) => void,
   timeoutMs: number = 300000,
-  pollIntervalMs: number = 3000
+  pollIntervalMs: number = 3000,
+  localTaskId?: string // 可选：本地任务ID，用于更新 IndexedDB
 ): Promise<ImageGenerationResponse> {
   const startTime = Date.now();
 
@@ -214,6 +210,15 @@ export async function waitForTaskComplete(
     const progress = parseInt(result.data.progress || '0');
 
     onProgress?.(status, progress);
+
+    // 如果传入了本地任务ID，同时更新 IndexedDB
+    if (localTaskId && taskStorageService) {
+      try {
+        await taskStorageService.updateTaskProgress(localTaskId, progress);
+      } catch (e) {
+        console.warn('[waitForTaskComplete] Failed to update progress in IDB:', e);
+      }
+    }
 
     if (status === 'SUCCESS') {
       // 尝试兼容不同的后端返回结构：

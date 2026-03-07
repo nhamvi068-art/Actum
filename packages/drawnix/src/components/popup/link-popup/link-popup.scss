@@ -1,9 +1,19 @@
 .drawnix {
   .link-popup {
-    padding-left: 8px;
+    padding: 8px 10px;
+    background: #ffffff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 
     &__link {
       font-size: 14px;
+      color: #4285f4;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
     }
 
     .link-popup__link {
@@ -15,12 +25,18 @@
     }
 
     &__input {
-      padding: 10px 0px;
       width: 328px;
-      border: none;
-      border-radius: 4px;
+      padding: 8px 10px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
       font-size: 14px;
       outline: none;
+
+      &:focus {
+        background: #ffffff;
+        border-color: #4285f4;
+      }
     }
   }
 }
