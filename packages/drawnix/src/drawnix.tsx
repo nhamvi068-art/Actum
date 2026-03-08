@@ -109,7 +109,6 @@ const withClearGroupIds = (board: PlaitBoard): PlaitBoard => {
 import { withCommonPlugin } from './plugins/with-common';
 import { CreationToolbar } from './components/toolbar/creation-toolbar';
 import { ZoomToolbar } from './components/toolbar/zoom-toolbar';
-import { SelectionToolbar } from './components/toolbar/selection-toolbar/selection-toolbar';
 import { PopupToolbar } from './components/toolbar/popup-toolbar/popup-toolbar';
 import { AppToolbar } from './components/toolbar/app-toolbar/app-toolbar';
 import classNames from 'classnames';
@@ -126,7 +125,6 @@ import { ClosePencilToolbar } from './components/toolbar/pencil-mode-toolbar';
 import { TTDDialog } from './components/ttd-dialog/ttd-dialog';
 import { CleanConfirm } from './components/clean-confirm/clean-confirm';
 import { buildTextLinkPlugin } from './plugins/with-text-link';
-import { LinkPopup } from './components/popup/link-popup/link-popup';
 import { I18nProvider } from './i18n';
 import { Tutorial } from './components/tutorial';
 import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
@@ -1613,7 +1611,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             <CreationToolbar></CreationToolbar>
             <ZoomToolbar></ZoomToolbar>
             <PopupToolbar></PopupToolbar>
-            <LinkPopup></LinkPopup>
             <ClosePencilToolbar></ClosePencilToolbar>
             <TTDDialog container={containerRef.current}></TTDDialog>
             <CleanConfirm container={containerRef.current}></CleanConfirm>

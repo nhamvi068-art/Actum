@@ -93,8 +93,8 @@ export const ColorPicker = React.forwardRef((props: ColorPickerProps, ref) => {
                     title={t((color.name || 'color.unknown') as keyof Translations)}
                     aria-label={t((color.name || 'color.unknown') as keyof Translations)}
                   >
-                    {isNoColor(color.value) && NoColorIcon}
-                    {selectedColor === color.value && Check}
+                    {isNoColor(color.value) && <NoColorIcon />}
+                    {selectedColor === color.value && <Check />}
                   </button>
                 );
               })}
