@@ -310,7 +310,7 @@ export async function markTaskAsInserted(taskId: string): Promise<void> {
 // Subscribe to task changes using Dexie liveQuery
 export function subscribeToTasks(
   callback: (tasks: ImageTask[]) => void,
-  interval: number = 1000
+  interval = 1000
 ): () => void {
   let subscription: Subscription | null = null;
 

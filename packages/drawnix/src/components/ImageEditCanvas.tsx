@@ -362,8 +362,8 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
       const offsetX = (displayWidth - rotatedWidth * scale) / 2;
       const offsetY = (displayHeight - rotatedHeight * scale) / 2;
 
-      let boxX = offsetX + cropBox.x * scale;
-      let boxY = offsetY + cropBox.y * scale;
+      const boxX = offsetX + cropBox.x * scale;
+      const boxY = offsetY + cropBox.y * scale;
       let boxWidth = cropBox.width * scale;
       let boxHeight = cropBox.height * scale;
 
@@ -470,8 +470,8 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
         const offsetX = (displayWidth - rotatedWidth * scale) / 2;
         const offsetY = (displayHeight - rotatedHeight * scale) / 2;
         
-        let boxX = offsetX + cropBox.x * scale;
-        let boxY = offsetY + cropBox.y * scale;
+        const boxX = offsetX + cropBox.x * scale;
+        const boxY = offsetY + cropBox.y * scale;
         let boxWidth = cropBox.width * scale;
         let boxHeight = cropBox.height * scale;
         
@@ -822,8 +822,8 @@ export const ImageEditCanvas: React.FC<ImageEditCanvasProps> = ({
         customBox?: { x: number; y: number; width: number; height: number }
     ) => {
         const cropBox = customBox || editState.cropBox;
-        let boxX = offsetX + cropBox.x * scale;
-        let boxY = offsetY + cropBox.y * scale;
+        const boxX = offsetX + cropBox.x * scale;
+        const boxY = offsetY + cropBox.y * scale;
         let boxWidth = cropBox.width * scale;
         let boxHeight = cropBox.height * scale;
 

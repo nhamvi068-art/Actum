@@ -184,7 +184,7 @@ export const useTaskActions = () => {
   };
 
   // 清理已完成/失败的任务
-  const cleanOldTasks = async (daysOld: number = 7) => {
+  const cleanOldTasks = async (daysOld = 7) => {
     const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
     const oldTasks = await db.tasks
       .where('updatedAt')

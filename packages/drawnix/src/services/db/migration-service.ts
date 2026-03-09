@@ -156,7 +156,7 @@ class MigrationService {
    */
   private async cacheTaskAsset(task: any): Promise<void> {
     try {
-      let imageData = task.resultImageUrl;
+      const imageData = task.resultImageUrl;
 
       // 如果是 URL，下载并缓存
       if (imageData.startsWith('http')) {

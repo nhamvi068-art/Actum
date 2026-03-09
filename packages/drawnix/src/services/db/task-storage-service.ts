@@ -136,7 +136,7 @@ export class TaskStorageService {
   /**
    * 清理旧任务
    */
-  async cleanOldTasks(daysOld: number = 30): Promise<number> {
+  async cleanOldTasks(daysOld = 30): Promise<number> {
     const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
     const oldTasks = await db.tasks
       .where('updatedAt')

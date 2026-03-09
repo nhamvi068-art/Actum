@@ -53,7 +53,7 @@ export class UnifiedCacheService {
    * @param assetId 可选的资产 ID
    * @returns 本地资产 ID
    */
-  async cacheBase64(base64Data: string, mimeType: string = 'image/png', assetId?: string): Promise<string> {
+  async cacheBase64(base64Data: string, mimeType = 'image/png', assetId?: string): Promise<string> {
     try {
       // 移除 data:image/png;base64, 前缀
       const base64Content = base64Data.split(',')[1] || base64Data;
