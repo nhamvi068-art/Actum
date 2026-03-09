@@ -266,7 +266,7 @@ export class CanvasService {
       .sortBy('createdAt');
 
     const snapshot = latestSnapshot[0];
-    let baseElements = snapshot?.elements || workspace.elements || [];
+    const baseElements = snapshot?.elements || workspace.elements || [];
 
     // 获取快照之后的增量
     const snapshotTime = snapshot?.createdAt || 0;

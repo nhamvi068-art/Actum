@@ -393,7 +393,7 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
       ...selectedImages.map(img => img.url),
     ].filter(Boolean);
 
-    let submitValue = inputValue.trim();
+    const submitValue = inputValue.trim();
     if (submitValue && onSubmit) {
       onSubmit(submitValue, allImages);
       setInputValue('');
@@ -413,7 +413,7 @@ export const BottomInputBar: React.FC<BottomInputBarProps> = ({
       ...selectedImages.map(img => img.url),
     ].filter(Boolean);
 
-    let submitValue = inputValue.trim();
+    const submitValue = inputValue.trim();
     if (submitValue && (onGenerateImage || onGenerateImageWithContext)) {
       // 触发发射动画
       if (onSendStart) {

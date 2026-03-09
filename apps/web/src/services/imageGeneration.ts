@@ -198,8 +198,8 @@ export async function getTaskStatus(taskId: string): Promise<TaskStatusResponse>
 export async function waitForTaskComplete(
   taskId: string,
   onProgress?: (status: string, progress: number) => void,
-  timeoutMs: number = 300000,
-  pollIntervalMs: number = 3000,
+  timeoutMs = 300000,
+  pollIntervalMs = 3000,
   localTaskId?: string // 可选：本地任务ID，用于更新 IndexedDB
 ): Promise<ImageGenerationResponse> {
   const startTime = Date.now();

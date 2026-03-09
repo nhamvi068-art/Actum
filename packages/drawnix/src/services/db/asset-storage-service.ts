@@ -96,7 +96,7 @@ export class AssetStorageService {
   /**
    * 清理过期资产（可选：基于时间或大小限制）
    */
-  async cleanOldAssets(daysOld: number = 30): Promise<number> {
+  async cleanOldAssets(daysOld = 30): Promise<number> {
     const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
     const oldAssets = await db.assets
       .where('createdAt')

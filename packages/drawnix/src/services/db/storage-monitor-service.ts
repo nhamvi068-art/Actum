@@ -115,7 +115,7 @@ class StorageMonitorService {
    * 启动定期监控
    * @param intervalMs 检查间隔（默认 60 秒）
    */
-  startMonitoring(intervalMs: number = 60000): void {
+  startMonitoring(intervalMs = 60000): void {
     if (this.monitoringInterval) return;
 
     this.monitoringInterval = window.setInterval(async () => {
