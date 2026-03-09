@@ -11,7 +11,6 @@ import {
   X,
   CheckCircle2,
   Loader2,
-  Download,
 } from 'lucide-react';
 
 // 兼容旧的 ImageTask 类型
@@ -82,6 +81,7 @@ export const TaskListButton: React.FC<TaskListButtonProps> = ({
   const { deleteTask: deleteTaskAction } = useTaskActions();
 
   // 获取所有任务（不筛选状态）
+  // 缩略图 URL：web 的 taskManager 写入顶层 resultImageUrl，drawnix 写入 result.remoteUrl，兼容两者
   const tasks = useMemo(() => {
     const projectTasks = allTasks
       .filter(t => t.workspaceId === projectId)
@@ -90,7 +90,7 @@ export const TaskListButton: React.FC<TaskListButtonProps> = ({
         projectId: t.workspaceId || projectId,
         createdAt: new Date(t.createdAt).toISOString(),
         updatedAt: new Date(t.updatedAt).toISOString(),
-        resultImageUrl: t.result?.remoteUrl
+        resultImageUrl: (t as any).resultImageUrl ?? t.result?.remoteUrl
       }));
     return projectTasks.sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -151,15 +151,25 @@ export const TaskListButton: React.FC<TaskListButtonProps> = ({
   // 处理重做
   const handleRedo = async (task: ImageTask, e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log('[DEBUG] handleRedo called', { taskId: task.id, onTaskRedo: !!onTaskRedo });
     if (onTaskRedo) {
       onTaskRedo(task);
+      console.log('[DEBUG] handleRedo onTaskRedo called');
+    } else {
+      console.warn('[DEBUG] handleRedo onTaskRedo is undefined!');
     }
   };
 
   // 处理删除
   const handleDelete = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    await deleteTaskAction(taskId);
+    console.log('[DEBUG] handleDelete called', { taskId, deleteTaskAction: !!deleteTaskAction });
+    try {
+      await deleteTaskAction(taskId);
+      console.log('[DEBUG] handleDelete completed', { taskId });
+    } catch (error) {
+      console.error('[DEBUG] handleDelete failed', error);
+    }
   };
 
   // 处理复制提示词
@@ -167,27 +177,6 @@ export const TaskListButton: React.FC<TaskListButtonProps> = ({
     e.stopPropagation();
     if (task.prompt) {
       navigator.clipboard.writeText(task.prompt);
-    }
-  };
-
-  // 处理下载图片
-  const handleDownload = async (task: ImageTask, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (task.resultImageUrl) {
-      try {
-        const response = await fetch(task.resultImageUrl);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `generated-image-${task.id}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Download failed:', error);
-      }
     }
   };
 
@@ -275,6 +264,8 @@ export const TaskListButton: React.FC<TaskListButtonProps> = ({
                       <div className={`history-item-thumb ${displayStatus === 'failed' ? 'history-item-thumb--failed' : displayStatus === 'success' ? 'history-item-thumb--success' : 'history-item-thumb--generating'}`}>
                         {displayStatus === 'success' && task.resultImageUrl ? (
                           <img src={task.resultImageUrl} alt="Generated" className="history-item-thumb-img" />
+                        ) : displayStatus === 'failed' && (task.placeholderInfo?.imageUrl || task.referenceImages?.[0]) ? (
+                          <img src={task.placeholderInfo?.imageUrl || task.referenceImages?.[0]} alt="原始图片" className="history-item-thumb-img" />
                         ) : displayStatus === 'generating' ? (
                           <Loader2 className="history-item-spinner" />
                         ) : (
@@ -315,11 +306,11 @@ export const TaskListButton: React.FC<TaskListButtonProps> = ({
                           <div className="history-item-actions">
                             {displayStatus === 'success' && (
                               <button
-                                onClick={(e) => handleDownload(task, e)}
-                                className="history-item-action-btn"
-                                title="下载图片"
+                                onClick={(e) => handleRedo(task, e)}
+                                className="history-item-action-btn history-item-action-btn--success"
+                                title="重试"
                               >
-                                <Download className="history-item-action-icon" />
+                                <RefreshCw className="history-item-action-icon" />
                               </button>
                             )}
                             <button

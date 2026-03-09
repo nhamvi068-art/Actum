@@ -38,6 +38,7 @@ export interface ImageTask {
   workspaceId?: string;  // Alias for projectId (for TaskListButton compatibility)
   cancelled?: boolean; // 标记任务是否被取消
   progress?: number; // 进度 0-100
+  insertedToCanvas?: boolean; // 标记任务是否已插入画布
 }
 
 // Generate unique task ID
@@ -292,6 +293,18 @@ export async function updateTaskProgress(taskId: string, progress: number): Prom
     progress: Math.min(100, Math.max(0, progress)),
     updatedAt: Date.now(),
   });
+}
+
+// Mark task as inserted to canvas
+export async function markTaskAsInserted(taskId: string): Promise<void> {
+  console.log('[TaskManager] markTaskAsInserted called:', taskId);
+  await db.tasks.update(taskId, {
+    insertedToCanvas: true,
+    updatedAt: Date.now(),
+  });
+  console.log('[TaskManager] markTaskAsInserted updated, now checking...');
+  const updated = await db.tasks.get(taskId);
+  console.log('[TaskManager] Task after update:', updated);
 }
 
 // Subscribe to task changes using Dexie liveQuery

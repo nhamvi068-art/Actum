@@ -524,12 +524,26 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
     e.preventDefault();
     // 阻止事件冒泡
     e.stopPropagation();
+
+    // 如果点击的是按钮或其他交互元素，不进行拖拽
+    const target = e.target as HTMLElement;
+    const isButton = target.closest('button');
+    const isInteractive = target.closest('.task-progress-card__icon-btn') || 
+                         target.closest('.task-progress-card__delete') ||
+                         target.closest('a') ||
+                         target.closest('input') ||
+                         target.closest('[role="button"]');
+    
+    if (isInteractive) {
+      console.log('[DEBUG] Skipping drag - clicked on interactive element');
+      return;
+    }
     
     if (!onPlaceholderMove) return;
     
     // 获取 DOM 元素并设置指针捕获
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
+    const currentTarget = e.currentTarget as HTMLElement;
+    currentTarget.setPointerCapture(e.pointerId);
     
     const startX = e.clientX;
     const startY = e.clientY;
@@ -628,6 +642,17 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
   const isError = status === 'failed';
   const isSubmitting = status === 'submitting';
 
+  // 调试日志
+  console.log('[DEBUG PlaceholderOverlay] Rendering', { 
+    placeholderId: placeholder.id, 
+    status,
+    hasOnDelete: !!onDelete,
+    hasOnRetry: !!onRetry,
+    hasOnConfirmInsert: !!onConfirmInsert,
+    isCompleted: status === 'completed',
+    isFailed: status === 'failed'
+  });
+
   // 生成时间显示（纯秒数格式，如 1200s）
   const [timeElapsed, setTimeElapsed] = useState<string>('');
 
@@ -642,16 +667,24 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
   // 处理删除按钮点击
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log('[DEBUG PlaceholderOverlay] handleDeleteClick called', { placeholderId: placeholder.id, onDelete: !!onDelete });
     if (onDelete) {
       onDelete(placeholder.id);
+      console.log('[DEBUG PlaceholderOverlay] onDelete called');
+    } else {
+      console.warn('[DEBUG PlaceholderOverlay] onDelete is undefined!');
     }
   };
 
   // 处理重试按钮点击
   const handleRetryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log('[DEBUG PlaceholderOverlay] handleRetryClick called', { placeholderId: placeholder.id, onRetry: !!onRetry });
     if (onRetry) {
       onRetry(placeholder.id);
+      console.log('[DEBUG PlaceholderOverlay] onRetry called');
+    } else {
+      console.warn('[DEBUG PlaceholderOverlay] onRetry is undefined!');
     }
   };
 
@@ -720,7 +753,10 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
               </div>
               <button
                 className="task-progress-card__delete"
-                onClick={handleDeleteClick}
+                onClick={(e) => {
+                  console.log('[DEBUG] Delete button clicked!', { placeholderId: placeholder.id, status });
+                  handleDeleteClick(e);
+                }}
                 title="删除"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -805,7 +841,10 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
               <div className="task-progress-card__icon-btns">
                 <button
                   className="task-progress-card__icon-btn"
-                  onClick={handleRetryClick}
+                  onClick={(e) => {
+                    console.log('[DEBUG] Retry button clicked!', { placeholderId: placeholder.id, status });
+                    handleRetryClick(e);
+                  }}
                   title="重新生成"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -816,6 +855,7 @@ const PlaceholderOverlayInner: React.FC<PlaceholderOverlayProps> = ({
                 <button
                   className="task-progress-card__icon-btn task-progress-card__icon-btn--primary"
                   onClick={(e) => {
+                    console.log('[DEBUG] Confirm button clicked!', { placeholderId: placeholder.id, status, taskId: placeholder.taskId });
                     e.stopPropagation();
                     if (onConfirmInsert) {
                       onConfirmInsert(placeholder.id, placeholder.taskId);
@@ -900,6 +940,8 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   const [selectedPlaceholderId, setSelectedPlaceholderId] = useState<string | null>(null);
   // 记录上次占位符放置的位置（用于下次放置的参考）
   const lastPlaceholderPositionRef = useRef<{ x: number; y: number } | null>(null);
+  // 记录上一次的占位符信息，用于避免无限循环
+  const prevPlaceholderRef = useRef<PlaceholderInfo | null>(null);
   const isInputFocusedRef = useRef(false);
 
   // 使用 useMemo 缓存视口属性，避免不必要的重渲染
@@ -912,6 +954,16 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     };
   }, [board?.viewport.zoom, board?.viewport.origination]);
 
+  // 调试：跟踪 fillInputData 变化
+  useEffect(() => {
+    console.log('[DEBUG Drawnix] fillInputData changed:', { 
+      hasData: !!fillInputData, 
+      prompt: fillInputData?.prompt,
+      imagesCount: fillInputData?.images?.length,
+      model: fillInputData?.model
+    });
+  }, [fillInputData]);
+
   // 恢复初始占位符（用于页面刷新后恢复任务）
   useEffect(() => {
     if (initialPlaceholder && !placeholderInfo) {
@@ -923,7 +975,19 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   // 当占位符更新时，通知父组件
   useEffect(() => {
     if (placeholderInfo && onPlaceholderUpdate) {
-      onPlaceholderUpdate(placeholderInfo);
+      // 使用 ref 检查占位符是否实际发生了变化，避免无限循环
+      const prevPlaceholder = prevPlaceholderRef.current;
+      const isChanged = !prevPlaceholder ||
+        prevPlaceholder.x !== placeholderInfo.x ||
+        prevPlaceholder.y !== placeholderInfo.y ||
+        prevPlaceholder.width !== placeholderInfo.width ||
+        prevPlaceholder.height !== placeholderInfo.height ||
+        prevPlaceholder.id !== placeholderInfo.id;
+
+      if (isChanged) {
+        prevPlaceholderRef.current = placeholderInfo;
+        onPlaceholderUpdate(placeholderInfo);
+      }
     }
   }, [placeholderInfo, onPlaceholderUpdate]);
 
@@ -1246,10 +1310,8 @@ export const Drawnix: React.FC<DrawnixProps> = ({
       width = fallbackBounds.width;
       height = fallbackBounds.height;
 
-      if (fallbackBounds.x !== undefined && fallbackBounds.y !== undefined) {
-        x = fallbackBounds.x;
-        y = fallbackBounds.y;
-      } else {
+      if ((fallbackBounds.x === undefined || fallbackBounds.x === 0) &&
+          (fallbackBounds.y === undefined || fallbackBounds.y === 0)) {
         // 使用视口中心作为默认位置
         const viewport = board.viewport;
         const zoom = viewport.zoom || 1;
@@ -1260,6 +1322,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
         const origY = viewport.origination?.[1] || 0;
         x = origX + (viewportWidth / 2) / zoom - width / 2;
         y = origY + (viewportHeight / 2) / zoom - height / 2;
+      } else {
+        x = fallbackBounds.x || 0;
+        y = fallbackBounds.y || 0;
       }
 
       // 使用 fallbackBounds 提供的元数据
@@ -1284,14 +1349,26 @@ export const Drawnix: React.FC<DrawnixProps> = ({
         // 清除选中状态
         clearSelectedElement(board);
         
-        // 在相同位置插入新的图片元素
-        const imageItem = {
-          url: imageUrl,
-          width: width,
-          height: height,
-        };
-        
-        DrawTransforms.insertImage(board, imageItem, [x, y]);
+        // 加载图片以获取真实尺寸，保证在画布中完整显示
+        const htmlImage = await loadHTMLImageElement(imageUrl);
+        const maxWidth = width; // 以占位符/回退区域的宽度作为最大宽度
+        const imageItem = buildImage(htmlImage, imageUrl, maxWidth);
+        console.log('[Drawnix] Image size for insertion:', {
+          naturalWidth: htmlImage.width,
+          naturalHeight: htmlImage.height,
+          targetWidth: imageItem.width,
+          targetHeight: imageItem.height,
+          placeholderWidth: width,
+          placeholderHeight: height,
+        });
+
+        // 以占位符/回退区域的中心为基准重新计算插入位置
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        const insertX = centerX - imageItem.width / 2;
+        const insertY = centerY - imageItem.height / 2;
+
+        DrawTransforms.insertImage(board, imageItem, [insertX, insertY]);
         
         // 获取刚插入的图片元素
         const newImageElement = board.children[board.children.length - 1];
@@ -1615,6 +1692,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             <TTDDialog container={containerRef.current}></TTDDialog>
             <CleanConfirm container={containerRef.current}></CleanConfirm>
             <BottomInputBar
+              key={`bottom-input-${fillInputData ? 'has-data' : 'empty'}-${fillInputData?.prompt || ''}`}
               placeholder="今天你想创作什么"
               imageUrls={selectedImageUrls}
               onImagesClear={() => setSelectedImageUrls([])}

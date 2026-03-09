@@ -79,7 +79,11 @@ export const OpenFile = () => {
         }).catch((error) => {
           // 用户取消文件选择时，showOpenFilePicker 会抛出 AbortError
           // 这种情况不需要显示错误信息
-          if (error.name !== 'AbortError') {
+          const isAbortError =
+            error.name === 'AbortError' ||
+            error.code === 'DOMException_ABORT_ERR' ||
+            error.message?.includes('abort');
+          if (!isAbortError) {
             console.error('Failed to open file:', error);
           }
         });

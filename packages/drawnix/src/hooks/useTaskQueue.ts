@@ -173,7 +173,14 @@ export const useTaskActions = () => {
 
   // 删除任务
   const deleteTask = async (taskId: string) => {
-    await db.tasks.delete(taskId);
+    console.log('[DEBUG useTaskActions] deleteTask called', { taskId });
+    try {
+      await db.tasks.delete(taskId);
+      console.log('[DEBUG useTaskActions] Task deleted from DB:', taskId);
+    } catch (error) {
+      console.error('[DEBUG useTaskActions] Failed to delete task:', error);
+      throw error;
+    }
   };
 
   // 清理已完成/失败的任务

@@ -5,6 +5,7 @@ import localforage from 'localforage';
 import LZString from 'lz-string';
 import { ApiConfigModal, ApiConfig } from '../components/ApiConfigModal/ApiConfigModal';
 import { ImageGeneratingPanel } from '../components/ImageGeneratingPanel/ImageGeneratingPanel';
+import { AnnouncementModal } from '../components/AnnouncementModal/AnnouncementModal';
 import CustomDropdown from '../components/CustomDropdown/CustomDropdown';
 import CardActionsDropdown from '../components/CardActionsDropdown/CardActionsDropdown';
 import { generateImage, generateImageAsync, waitForTaskComplete, urlToBase64 } from '../services/imageGeneration';
@@ -14,10 +15,12 @@ import {
   incrementRetryCount,
   getActiveTasks,
   getAllTasks,
+  getTaskById as getTask,
   cancelTask,
   isTaskCancelled,
   ImageTask,
   PlaceholderInfo,
+  markTaskAsInserted,
 } from '../services/taskManager';
 import TaskListButton from '../components/TaskNotificationPanel/TaskListButton';
 import logo from '../assets/logo.png';
@@ -267,7 +270,8 @@ function ProjectListView({
   deleteConfirm,
   onConfirmDelete,
   onCancelDelete,
-  onOpenApiConfig
+  onOpenApiConfig,
+  onOpenAnnouncement
 }: {
   projects: Project[];
   onSelectProject: (id: string) => void;
@@ -279,6 +283,7 @@ function ProjectListView({
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
   onOpenApiConfig: () => void;
+  onOpenAnnouncement: () => void;
 }) {
   console.log('ProjectListView rendering with projects:', projects.length);
   const [sortBy, setSortBy] = useState('recent');
@@ -320,6 +325,12 @@ function ProjectListView({
           <span className="logo-tag">EXPERIMENT</span>
         </div>
         <div className="header-right-custom">
+          <button className="header-announcement-btn" onClick={onOpenAnnouncement} title="Announcement">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </button>
           <button className="header-icon-custom" onClick={onOpenApiConfig} title="Settings">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -424,6 +435,7 @@ export function App() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [showApiConfig, setShowApiConfig] = useState(false);
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [apiConfig, setApiConfig] = useState<ApiConfig>({ apiKey: '', baseUrl: '' });
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState('');
@@ -436,6 +448,38 @@ export function App() {
   const [editedName, setEditedName] = useState('');
   const [tasks, setTasks] = useState<ImageTask[]>([]);
   // 用于填充输入栏的数据（重做功能）
+  // 根据 aspectRatio 计算占位符尺寸
+  const calculatePlaceholderSize = (aspectRatio: string): { width: number; height: number } => {
+    // 使用固定高度作为基准，根据比例计算宽度
+    const CARD_HEIGHT = 130;
+    const CARD_WIDTH = 180;
+
+    // 解析 aspectRatio (如 "16:9")
+    const parseRatio = (ratio: string): number => {
+      const [w, h] = ratio.split(':').map(Number);
+      return h > 0 ? w / h : 1;
+    };
+
+    const ratio = parseRatio(aspectRatio);
+
+    // 根据比例计算宽度，保持基准高度
+    // 如果比例大于1（宽图），使用基准宽度作为参考
+    // 如果比例小于1（竖图），使用基准高度
+    let width: number, height: number;
+
+    if (ratio >= 1) {
+      // 宽图或正方形：高度固定为 CARD_HEIGHT
+      height = CARD_HEIGHT;
+      width = Math.round(height * ratio);
+    } else {
+      // 竖图：宽度固定为 CARD_WIDTH
+      width = CARD_WIDTH;
+      height = Math.round(width / ratio);
+    }
+
+    return { width, height };
+  };
+
   const [fillInputData, setFillInputData] = useState<{
     prompt: string;
     images: string[];
@@ -670,17 +714,16 @@ export function App() {
     setCurrentModel(options.model || 'nano-banana');
     setIsGenerating(true);
 
-    // 创建占位符信息（使用固定卡片尺寸，与 Drawnix 保持一致）
-    const CARD_WIDTH = 180;
-    const CARD_HEIGHT = 130;
+    // 创建占位符信息（根据 aspectRatio 计算正确尺寸）
     const aspectRatio = options.aspect_ratio || '1:1';
     const imageSize = options.image_size || '1K';
+    const placeholderSize = calculatePlaceholderSize(aspectRatio);
     const placeholderInfo: DrawnixPlaceholderInfo = {
       id: `placeholder-${Date.now()}`,
       x: 0,
       y: 0,
-      width: CARD_WIDTH,
-      height: CARD_HEIGHT,
+      width: placeholderSize.width,
+      height: placeholderSize.height,
       aspectRatio,
     };
 
@@ -867,8 +910,8 @@ export function App() {
           console.log('[App][ImageGen] task updated -> completed (with Base64)', { localTaskId: task.id });
         }
 
-        // 更新占位符状态为已完成，并传入预览图
-        updatePlaceholderStatus('completed', undefined, displayImageSrc);
+        // 更新占位符状态为已完成，并传入预览图和任务ID
+        updatePlaceholderStatus('completed', undefined, displayImageSrc, task.id);
         console.log('[App][ImageGen] placeholder updated to completed with preview', { localTaskId: task.id });
 
         // 清理生成状态
@@ -1164,7 +1207,13 @@ export function App() {
 
   // 处理任务重做（已完成任务填充回输入栏）
   const handleTaskRedo = (task: ImageTask) => {
-    console.log('Redoing task - fill input:', task.id);
+    console.log('[DEBUG app.tsx] handleTaskRedo called', { 
+      taskId: task.id, 
+      prompt: task.prompt,
+      hasReferenceImages: !!(task.referenceImages && task.referenceImages.length > 0),
+      model: task.model,
+      aspectRatio: task.aspectRatio
+    });
     // 将原有参数填充到输入栏
     setFillInputData({
       prompt: task.prompt,
@@ -1173,15 +1222,17 @@ export function App() {
       aspectRatio: task.aspectRatio,
       imageSize: task.imageSize,
     });
+    console.log('[DEBUG app.tsx] fillInputData set');
   };
 
   // 处理占位符选中
-  const handlePlaceholderSelect = (placeholderId: string) => {
+  const handlePlaceholderSelect = useCallback((placeholderId: string) => {
     console.log('Placeholder selected:', placeholderId);
-  };
+  }, []);
 
   // 处理占位符删除
-  const handlePlaceholderDelete = async (placeholderId: string) => {
+  const handlePlaceholderDelete = useCallback(async (placeholderId: string) => {
+    console.log('[DEBUG app.tsx] handlePlaceholderDelete called', { placeholderId, currentTaskId });
     console.log('Placeholder deleted:', placeholderId);
     // 清理占位符
     clearPlaceholder();
@@ -1191,10 +1242,11 @@ export function App() {
       setIsGenerating(false);
       setCurrentTaskId(null);
     }
-  };
+  }, [currentTaskId, clearPlaceholder]);
 
   // 处理占位符重试 - 将原始参数填回输入框，让用户确认后重新生成
-  const handlePlaceholderRetry = (placeholderId: string) => {
+  const handlePlaceholderRetry = useCallback((placeholderId: string) => {
+    console.log('[DEBUG app.tsx] handlePlaceholderRetry called', { placeholderId, hasActiveTask: !!activeTask });
     console.log('Placeholder retry:', placeholderId);
     // 清理当前占位符（删除卡片）
     clearPlaceholder();
@@ -1208,14 +1260,27 @@ export function App() {
         imageSize: activeTask.imageSize,
       });
     }
-  };
+  }, [activeTask, clearPlaceholder, setFillInputData]);
 
   // 处理占位符确认插入（用户点击确定按钮）
-  const handlePlaceholderConfirmInsert = async (placeholderId: string, taskId?: string) => {
-    console.log('Placeholder confirm insert:', placeholderId, taskId);
+  const handlePlaceholderConfirmInsert = useCallback(async (placeholderId: string, taskIdFromPlaceholder?: string) => {
+    console.log('Placeholder confirm insert:', placeholderId, taskIdFromPlaceholder);
 
-    // 找到对应的任务
-    const targetTaskId = taskId || currentTaskId;
+    // 优先使用占位符中的 taskId，如果没有则使用 currentTaskId
+    let targetTaskId = taskIdFromPlaceholder || currentTaskId;
+
+    // 如果仍然没有 taskId，尝试从任务列表中查找
+    if (!targetTaskId && placeholderId && currentProjectId) {
+      const allTasks = await getAllTasks();
+      const projectTasks = allTasks.filter(t => t.projectId === currentProjectId);
+      // 查找状态为 completed 且 placeholderInfo.id 匹配的任务
+      const completedTask = projectTasks.find(t => t.status === 'completed' && t.placeholderInfo?.id === placeholderId);
+      if (completedTask) {
+        targetTaskId = completedTask.id;
+        console.log('[App] Found task by placeholderId:', targetTaskId);
+      }
+    }
+
     if (!targetTaskId) {
       console.warn('[App] No taskId for confirm insert');
       return;
@@ -1239,9 +1304,33 @@ export function App() {
       const board = boardRef.current;
       try {
         if ((board as any).handleImageGenerated) {
-          console.log('[App] Confirm insert: inserting image to canvas', { taskId: targetTaskId });
-          await (board as any).handleImageGenerated(imageUrl, undefined, targetTaskId, task.placeholderInfo);
+          console.log('[App] Confirm insert: inserting image to canvas', { taskId: targetTaskId, insertedToCanvas: task.insertedToCanvas });
+
+          // 再次检查确保任务未被插入 (使用 !== true 以处理 undefined 的情况)
+          if (task.insertedToCanvas === true) {
+            console.warn('[App] Confirm insert: task already inserted, skipping');
+            return;
+          }
+
+          await (board as any).handleImageGenerated(
+            imageUrl,
+            undefined,
+            targetTaskId,
+            {
+              width: task.placeholderInfo?.width || 180,
+              height: task.placeholderInfo?.height || 130,
+              prompt: task.prompt,
+              model: task.model,
+              aspect_ratio: task.aspectRatio,
+              image_size: task.imageSize,
+              referenceImages: task.referenceImages
+            }
+          );
           console.log('[App] Confirm insert: image inserted successfully');
+
+          // 标记任务为已插入画布，防止刷新后重复显示
+          await markTaskAsInserted(targetTaskId);
+          console.log('[App] Confirm insert: marked task as inserted');
         } else {
           console.warn('[App] Confirm insert: handleImageGenerated not available');
         }
@@ -1255,17 +1344,13 @@ export function App() {
 
     // 可选：更新任务状态为已插入（或保持 completed）
     // await updateTaskStatus(targetTaskId, 'completed', imageUrl);
-  };
+  }, [currentTaskId, currentProjectId, clearPlaceholder, getAllTasks, getTask]);
 
   // 处理占位符更新（同步 taskId）
-  const handlePlaceholderUpdate = (placeholderInfo: any) => {
+  const handlePlaceholderUpdate = useCallback((placeholderInfo: any) => {
     console.log('[App] Placeholder updated:', placeholderInfo);
-    // 如果当前有任务 ID，更新占位符的 taskId
-    if (currentTaskId && placeholderInfo) {
-      // 这里可以通过更新任务来持久化占位符位置等信息
-      // 但当前任务 ID 已经在 handleGenerateImage 中创建任务时关联
-    }
-  };
+    // 函数体内不需要使用 currentTaskId，移除不必要的依赖
+  }, []); // 空依赖数组，确保函数引用始终稳定
 
   // 处理任务点击（跳转到对应占位符）
   const handleTaskClick = (task: ImageTask) => {
@@ -1391,11 +1476,20 @@ export function App() {
           }
         }
 
-        // 恢复已完成但未确认的任务（用于显示"待确认"卡片）
+        // 恢复已完成但未插入画布的任务（用于显示"待确认"卡片）
+        // 注意：需要明确检查 insertedToCanvas !== true，因为旧任务的 insertedToCanvas 可能是 undefined
         const allProjectTasksForRestore = await getAllTasks();
+        console.log('[App] All tasks for restore:', allProjectTasksForRestore.map(t => ({
+          id: t.id,
+          status: t.status,
+          insertedToCanvas: t.insertedToCanvas,
+          projectId: t.projectId,
+        })));
         const completedTasks = allProjectTasksForRestore
-          .filter(t => t.projectId === currentProjectId && t.status === 'completed' && t.resultImageUrl)
+          .filter(t => t.projectId === currentProjectId && t.status === 'completed' && t.resultImageUrl && t.insertedToCanvas !== true)
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        console.log('[App] Filtered completed tasks:', completedTasks.length, completedTasks.map(t => ({ id: t.id, insertedToCanvas: t.insertedToCanvas })));
 
         if (completedTasks.length > 0) {
           console.log('[App] Found completed tasks to restore:', completedTasks.length);
@@ -1476,6 +1570,11 @@ export function App() {
           }}
           onCancelDelete={() => setDeleteConfirm(null)}
           onOpenApiConfig={() => setShowApiConfig(true)}
+          onOpenAnnouncement={() => setShowAnnouncement(true)}
+        />
+        <AnnouncementModal
+          isOpen={showAnnouncement}
+          onClose={() => setShowAnnouncement(false)}
         />
         <ApiConfigModal
           isOpen={showApiConfig}
