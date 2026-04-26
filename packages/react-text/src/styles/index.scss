@@ -1,0 +1,106 @@
+// 文本工具 foreignObject 容器样式
+// 核心：允许内容溢出，防止截断
+.plait-text-foreign-object {
+    overflow: visible;
+    background: transparent;
+    
+    // 隐藏所有滚动条
+    &::-webkit-scrollbar {
+        display: none;
+    }
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.plait-board-container {
+    .text {
+        foreignObject {
+            overflow-y: visible; // 允许内容溢出，高度自适应
+            &::-webkit-scrollbar {
+                display: none;
+            }
+            scrollbar-width: none;
+        }
+    }
+}
+
+.plait-text-container {
+    font-size: 14px;
+    min-height: 20px;
+    line-height: 20px;
+    display: block;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Noto Sans', 'Noto Sans CJK SC', 'Microsoft Yahei', 'Hiragino Sans GB', Arial, sans-serif;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    margin: 0;
+    padding: 0;
+
+    // 强制覆盖 Slate 内部 span 和 p 标签的自带字号，让它们继承外层的 font-size
+    span[data-slate-string],
+    span[data-slate-leaf],
+    p, h1, h2 {
+        font-size: inherit !important;
+    }
+
+    // 额外兜底：无论 Slate 生成何种标签，都强制继承容器字号/行高
+    [data-slate-editor] span,
+    [data-slate-editor] p,
+    [data-slate-string] {
+        font-size: inherit !important;
+        line-height: inherit;
+    }
+
+    // 重置块级元素的默认边距
+    p, h1, h2, h3, h4, h5, h6 {
+        margin: 0;
+        padding: 0;
+    }
+}
+
+.slate-editable-container {
+    outline: none;
+    padding: 0;
+    cursor: default;
+    
+    // contenteditable 激活时的样式
+    &[contenteditable="true"] {
+        cursor: text;
+        caret-color: #1890ff; // 自定义光标颜色
+        
+        // 去除 contenteditable 默认的 outline
+        &:focus {
+            outline: none;
+        }
+    }
+    
+    & [data-slate-node='element'] {
+        user-select: none;
+    }
+    &[contenteditable="true"] & [data-slate-node='element'] {
+        user-select: text;
+    }
+}
+
+.plait-text-editable {
+    // 确保可编辑区域没有额外的边框
+    outline: none;
+    
+    // 代码样式
+    code {
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        background-color: rgba(0, 0, 0, 0.06);
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-size: 0.9em;
+    }
+    
+    // 链接样式
+    a {
+        color: #1890ff;
+        text-decoration: none;
+        
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}

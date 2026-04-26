@@ -1,0 +1,375 @@
+/* 弹窗容器 */
+.image-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* 整体容器 */
+.image-edit-container {
+  display: flex;
+  width: 90vw;
+  max-width: 1200px;
+  height: 80vh;
+  max-height: 800px;
+  background-color: #000;
+  color: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 左侧控制面板 */
+.edit-sidebar {
+  width: 220px;
+  padding: 20px 16px;
+  background-color: #1a1a1a;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+}
+
+/* 标签切换 */
+.sidebar-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 12px;
+  background-color: #2d2d2d;
+  border: none;
+  border-radius: 4px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  background-color: #3d3d3d;
+}
+
+.tab.active {
+  background-color: #ff7d00;
+  color: #fff;
+}
+
+/* 分区标题 */
+.section-title {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 12px;
+}
+
+/* 裁剪比例按钮 */
+.ratio-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ratio-btn {
+  padding: 8px 0;
+  background-color: #2d2d2d;
+  border: none;
+  border-radius: 4px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.ratio-btn:hover {
+  background-color: #3d3d3d;
+}
+
+.ratio-btn.active {
+  background-color: #ff7d00;
+  color: #fff;
+}
+
+/* 滤镜预设按钮 */
+.filter-preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.filter-preset-btn {
+  padding: 8px 4px;
+  background-color: #2d2d2d;
+  border: none;
+  border-radius: 4px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.filter-preset-btn:hover {
+  background-color: #3d3d3d;
+}
+
+.filter-preset-btn.active {
+  background-color: #ff7d00;
+  color: #fff;
+}
+
+/* 滤镜参数滑块 */
+.filter-param-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.param-label {
+  font-size: 12px;
+  color: #ccc;
+  width: 40px;
+}
+
+.param-slider {
+  flex: 1;
+  height: 4px;
+  background-color: #333;
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.param-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #ff7d00;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.param-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.param-value {
+  font-size: 12px;
+  color: #999;
+  width: 36px;
+  text-align: right;
+}
+
+/* 右侧画布容器 */
+.edit-canvas-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-color: #0a0a0a;
+}
+
+/* 画布样式 */
+.edit-canvas {
+  max-width: 100%;
+  max-height: calc(80vh - 120px);
+  border: 1px solid #333;
+  background-color: #000;
+}
+
+/* 顶部工具栏 */
+.top-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: rgba(0, 0, 0, 0.8);
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+
+.toolbar-title {
+  font-size: 14px;
+  color: #fff;
+  margin-right: 8px;
+}
+
+.toolbar-btn {
+  padding: 6px 16px;
+  background-color: transparent;
+  border: 1px solid #666;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+  background-color: #333;
+  border-color: #888;
+}
+
+.toolbar-btn.confirm {
+  background-color: #ff7d00;
+  border-color: #ff7d00;
+  color: #fff;
+}
+
+.toolbar-btn.confirm:hover {
+  background-color: #ff9500;
+  border-color: #ff9500;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn.active {
+  background-color: #ff7d00;
+  border-color: #ff7d00;
+  color: #fff;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #666;
+  margin: 0 4px;
+}
+
+/* 底部缩放控制 */
+.scale-control {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: rgba(0, 0, 0, 0.8);
+  padding: 6px 12px;
+  border-radius: 4px;
+}
+
+.scale-btn {
+  width: 24px;
+  height: 24px;
+  background-color: transparent;
+  border: 1px solid #666;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.scale-btn:hover {
+  background-color: #333;
+  border-color: #888;
+}
+
+.scale-text {
+  font-size: 12px;
+  color: #ccc;
+  width: 50px;
+  text-align: center;
+}
+
+/* 开关样式 */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  background-color: #333;
+  border-radius: 20px;
+  transition: 0.3s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+input:checked + .slider {
+  background-color: #ff7d00;
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.switch-label {
+  margin-left: 12px;
+  font-size: 12px;
+  color: #ccc;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .image-edit-container {
+    flex-direction: column;
+    width: 95vw;
+    height: 90vh;
+  }
+
+  .edit-sidebar {
+    width: 100%;
+    height: 200px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 12px;
+  }
+
+  .sidebar-tabs {
+    width: 100%;
+  }
+
+  .crop-panel,
+  .filter-panel {
+    flex: 1;
+    min-width: 200px;
+  }
+}
+

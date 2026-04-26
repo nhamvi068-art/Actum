@@ -1,0 +1,81 @@
+// Test file - minimal structure
+@import "../../styles/variables.module.scss";
+
+.bottom-input-bar {
+  position: absolute;
+}
+
+// Spinning animation
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+// Mobile styles
+@include isMobile {
+  .bottom-input-bar {
+    bottom: 16px;
+
+    &__container {
+      padding: 10px 12px;
+    }
+
+    &__input {
+      font-size: 14px;
+    }
+
+    &__toolbar {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    &__toolbar-right {
+      flex-wrap: wrap;
+    }
+
+    &__generate-btn {
+      width: 24px;
+      height: 24px;
+    }
+
+    &__preview-image-item {
+      width: 48px;
+      height: 48px;
+    }
+  }
+}

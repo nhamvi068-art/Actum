@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Actum - Nebula Background Effect</title>
+  <style>
+    :root {
+      --primary-color: #8B5CF6;
+      --primary-hover: #7c3aed;
+      --text-main: #374151;
+      --text-muted: #6b7280;
+      --text-light: #9ca3af;
+      --bg-color: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ========== 简洁背景动画 ========== */
+    .page-background {
+      position: fixed;
+      inset: 0;
+      background: white;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .nebula-container {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      max-width: 1400px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+      animation: spin-slow 40s linear infinite;
+    }
+
+    @keyframes spin-slow {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes liquid {
+      0% { transform: translate(0px, 0px) scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+      15% { transform: translate(-100px, -80px) scale(1.2); border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
+      33% { transform: translate(80px, -120px) scale(0.9); border-radius: 20% 80% 20% 80% / 80% 20% 80% 20%; }
+      50% { transform: translate(-80px, 100px) scale(1.1); border-radius: 70% 30% 40% 60% / 50% 60% 30% 50%; }
+      66% { transform: translate(100px, -50px) scale(0.85); border-radius: 40% 60% 70% 30% / 40% 50% 30% 60%; }
+      85% { transform: translate(-50px, 50px) scale(1.05); border-radius: 70% 30% 40% 60% / 50% 60% 30% 50%; }
+      100% { transform: translate(0px, 0px) scale(1); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+    }
+
+    @keyframes separate-fuse {
+      0%, 100% { box-shadow: 0 0 0 0 var(--blob-color); }
+      50% { box-shadow: 60px -60px 0 -15px var(--blob-color), -60px 60px 0 -15px var(--blob-color); }
+    }
+
+    @keyframes color-breathe {
+      0%, 100% { filter: blur(65px) brightness(0.85) saturate(0.9); }
+      50% { filter: blur(65px) brightness(1.0) saturate(1.2); }
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      mix-blend-mode: soft-light;
+      filter: blur(65px) brightness(0.95) saturate(1.0);
+      opacity: 0.6;
+      will-change: transform, border-radius, box-shadow;
+      backface-visibility: hidden;
+    }
+
+    .blob-1 {
+      top: 10%;
+      left: 10%;
+      width: 70%;
+      height: 60%;
+      background: radial-gradient(circle at 30% 30%, rgba(191, 219, 254, 0.8) 0%, rgba(147, 197, 253, 0.4) 50%, rgba(191, 219, 254, 0.1) 100%);
+      animation: liquid 14s ease-in-out infinite,
+                 separate-fuse 7s ease-in-out infinite,
+                 color-breathe 10s ease-in-out infinite;
+      --blob-color: #BFDBFE;
+    }
+
+    .blob-2 {
+      top: 10%;
+      right: 10%;
+      width: 70%;
+      height: 60%;
+      background: radial-gradient(circle at 40% 40%, rgba(165, 180, 252, 0.8) 0%, rgba(129, 140, 248, 0.4) 50%, rgba(165, 180, 252, 0.1) 100%);
+      animation: liquid 14s ease-in-out infinite 3s,
+                 separate-fuse 7s ease-in-out infinite 3s,
+                 color-breathe 10s ease-in-out infinite 3s;
+      --blob-color: #A5B4FC;
+    }
+
+    .blob-3 {
+      bottom: 10%;
+      left: 10%;
+      width: 70%;
+      height: 60%;
+      background: radial-gradient(circle at 35% 35%, rgba(221, 214, 254, 0.8) 0%, rgba(192, 132, 252, 0.4) 50%, rgba(221, 214, 254, 0.1) 100%);
+      animation: liquid 14s ease-in-out infinite 6s,
+                 separate-fuse 7s ease-in-out infinite 6s,
+                 color-breathe 10s ease-in-out infinite 6s;
+      --blob-color: #DDD6FE;
+    }
+
+    /* ========== 内容区域样式 ========== */
+    .content {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .hero {
+      text-align: center;
+      max-width: 800px;
+    }
+
+    .hero h1 {
+      font-size: 64px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 24px;
+      color: #64748b;
+      margin-bottom: 40px;
+      font-weight: 400;
+    }
+
+    .cta-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 32px;
+      font-size: 18px;
+      font-weight: 500;
+      color: white;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 9999px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .cta-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 35px -5px rgba(102, 126, 234, 0.5);
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+      margin-top: 80px;
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    .feature-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+    }
+
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .feature-card h3 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    /* ========== 鼠标跟随效果（由JS实现） ========== */
+  </style>
+</head>
+<body>
+  <!-- 背景容器 -->
+  <div class="page-background">
+    <div class="nebula-container">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+  </div>
+
+  <!-- 内容区域 -->
+  <div class="content">
+    <div class="hero">
+      <h1>Omni Canvas</h1>
+      <p>探索、扩展、完善你的创意</p>
+      <button class="cta-button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+        </svg>
+        开始创作
+      </button>
+    </div>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>思维导图</h3>
+        <p>快速创建精美的思维导图，整理你的想法</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📝</div>
+        <h3>流程图</h3>
+        <p>轻松绘制专业流程图，展示工作流程</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">✨</div>
+        <h3>AI 生成</h3>
+        <p>AI 智能生成图片，让创意无限延伸</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 鼠标跟随效果
+    document.addEventListener('DOMContentLoaded', () => {
+      const blobs = document.querySelectorAll('.blob');
+      let targetX = 0;
+      let targetY = 0;
+      let currentX = 0;
+      let currentY = 0;
+      let animationFrame;
+
+      const handleMouseMove = (e) => {
+        targetX = (e.clientX / window.innerWidth - 0.5) * 6;
+        targetY = (e.clientY / window.innerHeight - 0.5) * 6;
+      };
+
+      const animate = () => {
+        // 平滑插值
+        currentX += (targetX - currentX) * 0.08;
+        currentY += (targetY - currentY) * 0.08;
+
+        blobs.forEach((blob, index) => {
+          const el = blob;
+          const multipliers = [0.6, 0.3, 1.0]; // 不同 blob 不同响应强度
+          const offsetX = currentX * multipliers[index];
+          const offsetY = currentY * multipliers[index];
+          el.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        });
+
+        animationFrame = requestAnimationFrame(animate);
+      };
+
+      window.addEventListener('mousemove', handleMouseMove);
+      animate();
+    });
+  </script>
+</body>
+</html>

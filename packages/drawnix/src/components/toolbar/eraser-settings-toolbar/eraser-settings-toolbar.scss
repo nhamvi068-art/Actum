@@ -1,0 +1,65 @@
+// Eraser Settings Toolbar Styles
+// Template: Same style as pencil-settings-toolbar
+
+.eraser-settings-island {
+  user-select: none;
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: #fff;
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  }
+}
+
+.eraser-settings-container {
+  display: flex;
+  align-items: center;
+  gap: 16px; // Same as pencil toolbar
+  min-height: 40px; // Same as pencil toolbar
+  padding: 0 16px; // Same as pencil toolbar
+}
+
+.eraser-settings-island .slider-container {
+  padding: 0;
+}
+
+.eraser-settings-section {
+  display: flex;
+  align-items: center;
+}
+
+.eraser-settings-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #f3f4f6; // Same as pencil toolbar divider
+  flex-shrink: 0;
+}
+
+// 禁用状态：保持全透明度，只阻止交互
+.eraser-settings-island .slider-container.disabled {
+  opacity: 1;
+  cursor: default;
+
+  .slider-track,
+  .slider-thumb {
+    cursor: default;
+  }
+}
+
+// 局部缩小轨道与拇指，匹配纤细高度
+.eraser-settings-island .slider-container .slider-track {
+  height: 3px;
+  border-radius: 1.5px;
+}
+
+.eraser-settings-island .slider-container .slider-thumb {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+// Preview 预览区域移除（与画笔工具栏保持一致）

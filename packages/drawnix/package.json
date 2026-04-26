@@ -1,0 +1,42 @@
+{
+  "name": "@drawnix/drawnix",
+  "version": "0.4.0-2",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "private": false,
+  "files": [
+    "public"
+  ],
+  "dependencies": {
+    "@floating-ui/react": "^0.26.24",
+    "@plait-board/markdown-to-drawnix": "^0.0.8",
+    "@plait-board/mermaid-to-drawnix": "^0.0.7",
+    "cropperjs": "^1.6.2",
+    "dexie": "^4.0.11",
+    "dexie-react-hooks": "^4.2.0",
+    "jszip": "^3.10.1",
+    "laser-pen": "^1.0.1",
+    "lucide-react": "^1.7.0",
+    "mobile-detect": "^1.4.5",
+    "open-color": "^1.9.1",
+    "react-colorful": "^5.6.1",
+    "react-cropper": "^2.3.3",
+    "tdesign-icons-react": "^0.6.2",
+    "tdesign-react": "^1.16.7",
+    "winbox": "^0.2.82"
+  },
+  "devDependencies": {
+    "@types/dexie": "^1.1.5",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.17"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js",
+      "types": "./index.d.ts"
+    },
+    "./index.css": "./index.css"
+  }
+}

@@ -1,0 +1,110 @@
+/* 裁剪覆盖层容器 - 覆盖在图片上方 */
+.crop-overlay-wrapper {
+  position: absolute;
+  overflow: visible;
+  z-index: 9998;
+  pointer-events: auto;
+}
+
+/* 裁剪框本体 - 带边框，背景透明 */
+.crop-active-box {
+  position: absolute;
+  border: 2px solid #4096ff;
+  box-sizing: border-box;
+  cursor: move;
+  z-index: 10;
+  background: transparent;
+}
+
+/* 九宫格分割线 - CSS Grid 实现 */
+.crop-grid-lines {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.grid-cell {
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.grid-cell:nth-child(3n) {
+  border-right: none;
+}
+
+.grid-cell:nth-child(n+7) {
+  border-bottom: none;
+}
+
+/* 控制点/拖拽手柄 */
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #4096ff;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  z-index: 20;
+}
+
+/* 四个角 */
+.resize-handle.nw {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+
+.resize-handle.ne {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.se {
+  bottom: -5px;
+  right: -5px;
+  cursor: nwse-resize;
+}
+
+/* 四条边 */
+.resize-handle.n {
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.resize-handle.s {
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.resize-handle.w {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.resize-handle.e {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}

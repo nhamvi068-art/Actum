@@ -1,0 +1,26 @@
+// Draggable Toolbar Styles
+
+.draggable-toolbar {
+  user-select: none;
+  cursor: grab;
+  touch-action: none;
+
+  &--dragging {
+    cursor: grabbing;
+    opacity: 0.95;
+
+    // 拖拽时添加微妙的阴影效果
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  }
+
+  // 默认样式继承 Island
+  .island {
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+    }
+  }
+}

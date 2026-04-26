@@ -1,0 +1,65 @@
+.card-actions-dropdown {
+  position: relative;
+}
+
+.card-actions-dropdown-trigger {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.card-actions-dropdown-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  min-width: 160px;
+  z-index: 100; /* Increase z-index */
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: visible; /* Ensure overflow is visible */
+}
+
+.card-actions-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  border-radius: 4px;
+  text-align: left;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+
+  &.danger {
+    color: #ef4444;
+
+    &:hover {
+      background-color: #fee2e2;
+    }
+  }
+}
+

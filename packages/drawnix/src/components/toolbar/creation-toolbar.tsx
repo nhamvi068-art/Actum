@@ -1,0 +1,358 @@
+import React, { useState } from 'react';
+import classNames from 'classnames';
+import { Island } from '../island';
+import Stack from '../stack';
+import { ToolButton } from '../tool-button';
+import {
+  HandIcon,
+  SelectionIcon,
+  ShapeIcon,
+  TextIcon,
+  StraightArrowLineIcon,
+  FeltTipPenIcon,
+  ImageIcon,
+  ExtraToolsIcon,
+} from '../icons';
+import { useBoard } from '@plait-board/react-board';
+import {
+  ATTACHED_ELEMENT_CLASS_NAME,
+  BoardTransforms,
+  PlaitBoard,
+  PlaitPointerType,
+} from '@plait/core';
+import { BoardCreationMode, setCreationMode } from '@plait/common';
+import {
+  ArrowLineShape,
+  BasicShapes,
+  DrawPointerType,
+  FlowchartSymbols,
+} from '@plait/draw';
+import { ShapePicker } from '../shape-picker';
+import { ArrowPicker } from '../arrow-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '../popover/popover';
+import { FreehandPanel } from './freehand-panel/freehand-panel';
+import { FreehandShape } from '../../plugins/freehand/type';
+import {
+  DrawnixPointerTypeValue,
+  useDrawnix,
+  useSetPointer,
+} from '../../hooks/use-drawnix';
+import { ExtraToolsButton } from './extra-tools/extra-tools-button';
+import { addImage } from '../../utils/image';
+import { useI18n } from '../../i18n';
+import { SHAPES } from '../shape-picker';
+import { ARROWS } from '../arrow-picker';
+import { setIsPencilMode } from '../../plugins/with-pencil';
+
+export enum PopupKey {
+  'shape' = 'shape',
+  'arrow' = 'arrow',
+  'freehand' = 'freehand',
+}
+
+type AppToolButtonProps = {
+  titleKey?: string;
+  name?: string;
+  icon: React.ReactNode;
+  pointer?: DrawnixPointerTypeValue;
+  key?: PopupKey | 'image' | 'extra-tools';
+};
+
+const isBasicPointer = (pointer: string) => {
+  return (
+    pointer === PlaitPointerType.hand || pointer === PlaitPointerType.selection
+  );
+};
+
+export const BUTTONS: AppToolButtonProps[] = [
+  {
+    icon: HandIcon,
+    pointer: PlaitPointerType.hand,
+    titleKey: 'toolbar.hand',
+  },
+  {
+    icon: SelectionIcon,
+    pointer: PlaitPointerType.selection,
+    titleKey: 'toolbar.selection',
+  },
+  {
+    icon: TextIcon,
+    pointer: BasicShapes.text,
+    titleKey: 'toolbar.text',
+  },
+  {
+    icon: FeltTipPenIcon,
+    pointer: FreehandShape.feltTipPen,
+    titleKey: 'toolbar.pen',
+    key: PopupKey.freehand,
+  },
+  {
+    icon: ShapeIcon,
+    titleKey: 'toolbar.shape',
+    key: PopupKey.shape,
+    pointer: BasicShapes.rectangle,
+  },
+  {
+    icon: StraightArrowLineIcon,
+    titleKey: 'toolbar.arrow',
+    key: PopupKey.arrow,
+    pointer: ArrowLineShape.straight,
+  },
+  {
+    icon: ExtraToolsIcon,
+    titleKey: 'toolbar.extraTools',
+    key: 'extra-tools',
+  },
+  {
+    icon: ImageIcon,
+    titleKey: 'toolbar.image',
+    key: 'image',
+  },
+];
+
+export const isArrowLinePointer = (board: PlaitBoard) => {
+  return Object.keys(ArrowLineShape).includes(board.pointer);
+};
+
+export const isShapePointer = (board: PlaitBoard) => {
+  return (
+    Object.keys(BasicShapes).includes(board.pointer) ||
+    Object.keys(FlowchartSymbols).includes(board.pointer)
+  );
+};
+
+export const CreationToolbar = () => {
+  const board = useBoard();
+  const { appState, setAppState } = useDrawnix();
+  const { t } = useI18n();
+  const setPointer = useSetPointer();
+  const container = PlaitBoard.getBoardContainer(board);
+
+  const [arrowOpen, setArrowOpen] = useState(false);
+  const [shapeOpen, setShapeOpen] = useState(false);
+  const [freehandOpen, setFreehandOpen] = useState(false);
+  const [lastShapePointer, setLastShapePointer] = useState<string | undefined>(SHAPES[0].pointer);
+  const [lastArrowPointer, setLastArrowPointer] = useState<string | undefined>(ARROWS[0].pointer);
+
+  const onPointerDown = (pointer: DrawnixPointerTypeValue) => {
+    setCreationMode(board, BoardCreationMode.dnd);
+    BoardTransforms.updatePointerType(board, pointer);
+    setPointer(pointer);
+
+    // 画笔工具进入画笔模式，显示顶部设置工具栏
+    if (
+      pointer === FreehandShape.feltTipPen ||
+      pointer === FreehandShape.markerHighlight ||
+      pointer === FreehandShape.nibPen ||
+      pointer === FreehandShape.artisticBrush
+    ) {
+      setAppState({ ...appState, isPencilMode: true });
+      setIsPencilMode(board, true);
+    } else if (pointer === FreehandShape.eraser) {
+      // 橡皮擦工具
+      setAppState({ ...appState, isPencilMode: false });
+      setIsPencilMode(board, false);
+    }
+  };
+
+  const onPointerUp = () => {
+    setCreationMode(board, BoardCreationMode.drawing);
+  };
+
+  const isChecked = (button: AppToolButtonProps) => {
+    return PlaitBoard.isPointer(board, button.pointer);
+  };
+
+  const checkCurrentPointerIsFreehand = (board: PlaitBoard) => {
+    return PlaitBoard.isInPointer(board, [
+      FreehandShape.feltTipPen,
+      FreehandShape.eraser,
+      FreehandShape.markerHighlight,
+      FreehandShape.nibPen,
+      FreehandShape.artisticBrush,
+    ]);
+  };
+
+  return (
+    <>
+    <Island
+      padding={1}
+      className={classNames('draw-toolbar', ATTACHED_ELEMENT_CLASS_NAME)}
+      style={{
+        position: 'absolute',
+        left: '20px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: 200,
+        borderRadius: '40px',
+      }}
+    >
+      <Stack.Col gap={1}>
+        {BUTTONS.map((button, index) => {
+          if (appState.isMobile && button.pointer === PlaitPointerType.hand) {
+            return <></>;
+          }
+          if (button.key === PopupKey.freehand) {
+            return (
+              <Popover
+                key={index}
+                open={freehandOpen}
+                sideOffset={12}
+                placement="right-start"
+                onOpenChange={(open) => {
+                  setFreehandOpen(open);
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <ToolButton
+                    type="icon"
+                    visible={true}
+                    selected={
+                      freehandOpen ||
+                      checkCurrentPointerIsFreehand(board)
+                    }
+                    icon={button.icon}
+                    title={button.titleKey ? t(button.titleKey as any) : 'Freehand'}
+                    aria-label={button.titleKey ? t(button.titleKey as any) : 'Freehand'}
+                    onPointerDown={() => {
+                      setFreehandOpen(!freehandOpen);
+                    }}
+                  />
+                </PopoverTrigger>
+                <PopoverContent container={container}>
+                  <FreehandPanel
+                    onPointerUp={(pointer: DrawnixPointerTypeValue) => {
+                      setFreehandOpen(false);
+                      onPointerDown(pointer);
+                      onPointerUp();
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            );
+          }
+          if (button.key === PopupKey.shape) {
+            return (
+              <Popover
+                key={index}
+                open={shapeOpen}
+                sideOffset={12}
+                placement="right-start"
+                onOpenChange={(open) => {
+                  setShapeOpen(open);
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <ToolButton
+                    type="icon"
+                    visible={true}
+                    selected={
+                      shapeOpen ||
+                      (isShapePointer(board) &&
+                        !PlaitBoard.isPointer(board, BasicShapes.text))
+                    }
+                    icon={button.icon}
+                    title={button.titleKey ? t(button.titleKey as any) : 'Shape'}
+                    aria-label={button.titleKey ? t(button.titleKey as any) : 'Shape'}
+                    onPointerDown={() => {
+                      setShapeOpen(!shapeOpen);
+                      if (isShapePointer(board)) {
+                        BoardTransforms.updatePointerType(board, board.pointer);
+                      } else {
+                        setPointer(lastShapePointer ? lastShapePointer as DrawnixPointerTypeValue : SHAPES[0].pointer);
+                        setCreationMode(board, BoardCreationMode.drawing);
+                        BoardTransforms.updatePointerType(board, lastShapePointer || SHAPES[0].pointer);
+                      }
+                    }}
+                  />
+                </PopoverTrigger>
+                <PopoverContent container={container}>
+                  <ShapePicker
+                    onPointerUp={(pointer: DrawPointerType) => {
+                      setShapeOpen(false);
+                      setPointer(pointer);
+                      setLastShapePointer(pointer);
+                    }}
+                  ></ShapePicker>
+                </PopoverContent>
+              </Popover>
+            );
+          }
+          if (button.key === PopupKey.arrow) {
+            return (
+              <Popover
+                key={index}
+                open={arrowOpen}
+                sideOffset={12}
+                placement="right-start"
+                onOpenChange={(open) => {
+                  setArrowOpen(open);
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <ToolButton
+                    type="icon"
+                    visible={true}
+                    selected={arrowOpen || isArrowLinePointer(board)}
+                    icon={button.icon}
+                    title={button.titleKey ? t(button.titleKey as any) : ''}
+                    aria-label={button.titleKey ? t(button.titleKey as any) : ''}
+                    onPointerDown={() => {
+                      setArrowOpen(!arrowOpen);
+                      if (isArrowLinePointer(board)) {
+                        BoardTransforms.updatePointerType(board, board.pointer);
+                      } else {
+                        setCreationMode(board, BoardCreationMode.drawing);
+                        BoardTransforms.updatePointerType(board, lastArrowPointer || ARROWS[0].pointer);
+                        setPointer(lastArrowPointer ? lastArrowPointer as DrawnixPointerTypeValue : ARROWS[0].pointer);
+                      }
+                    }}
+                  />
+                </PopoverTrigger>
+                <PopoverContent container={container}>
+                  <ArrowPicker
+                    onPointerUp={(pointer: DrawPointerType) => {
+                      setArrowOpen(false);
+                      setPointer(pointer);
+                      setLastArrowPointer(pointer);
+                    }}
+                  ></ArrowPicker>
+                </PopoverContent>
+              </Popover>
+            );
+          }
+          if (button.key === 'extra-tools') {
+            return <ExtraToolsButton key={index}></ExtraToolsButton>;
+          }
+          return (
+            <ToolButton
+              key={index}
+              type="radio"
+              icon={button.icon}
+              checked={isChecked(button)}
+              title={button.titleKey ? t(button.titleKey as any) : ''}
+              aria-label={button.titleKey ? t(button.titleKey as any) : ''}
+              onPointerDown={() => {
+                if (button.pointer && !isBasicPointer(button.pointer)) {
+                  onPointerDown(button.pointer);
+                }
+              }}
+              onPointerUp={() => {
+                if (button.pointer && !isBasicPointer(button.pointer)) {
+                  onPointerUp();
+                } else if (button.pointer && isBasicPointer(button.pointer)) {
+                  BoardTransforms.updatePointerType(board, button.pointer);
+                  setPointer(button.pointer);
+                }
+                if (button.key === 'image') {
+                  addImage(board);
+                }
+              }}
+            />
+          );
+        })}
+      </Stack.Col>
+    </Island>
+    </>
+  );
+};

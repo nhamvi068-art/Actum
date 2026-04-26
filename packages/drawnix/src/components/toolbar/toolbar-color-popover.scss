@@ -1,0 +1,31 @@
+.toolbar-color-popover-trigger {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--island-border-color, #e5e7eb);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  // Override tool-icon defaults that would break the compact circular design
+  display: inline-block;
+  min-width: unset;
+  min-height: unset;
+  line-height: 1;
+
+  &:hover {
+    transform: scale(1.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+  }
+}
+
+.toolbar-color-popover-panel {
+  min-width: 200px;
+}

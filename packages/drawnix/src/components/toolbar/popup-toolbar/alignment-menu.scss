@@ -1,0 +1,14 @@
+.alignment-menu-content {
+  padding: 8px;
+  min-width: 120px;
+  background: var(--color-surface, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+}
+
+.alignment-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}

@@ -1,0 +1,36 @@
+// Mobile styles
+@include isMobile {
+  .bottom-input-bar {
+    bottom: 16px;
+    width: calc(100% - 32px);
+    max-width: none;
+
+    &__container {
+      padding: 10px 12px;
+      border-radius: 10px;
+    }
+
+    &__input {
+      font-size: 14px;
+    }
+
+    &__toolbar {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    &__toolbar-right {
+      flex-wrap: wrap;
+    }
+
+    &__generate-btn {
+      width: 24px;
+      height: 24px;
+    }
+
+    &__preview-image-item {
+      width: 48px;
+      height: 48px;
+    }
+  }
+}

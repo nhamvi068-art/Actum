@@ -1,0 +1,29 @@
+/**
+ * 关闭按钮样式 (Close Button Styles)
+ *
+ * 固定定位在顶部居中的关闭按钮
+ */
+
+.pencil-mode-toolbar {
+  position: static;
+  flex-shrink: 0;
+  z-index: 1;
+  background-color: var(--island-bg-color);
+  border-radius: 40px;
+  box-shadow: var(--shadow-island);
+  border: 1px solid var(--island-border-color);
+  backdrop-filter: blur(10px);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &__close {
+    color: var(--color-on-surface-variant);
+
+    &:hover {
+      color: var(--color-on-surface);
+    }
+  }
+}

@@ -1,0 +1,14 @@
+.distribute-menu-content {
+  padding: 8px;
+  min-width: 80px;
+  background: var(--color-surface, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+}
+
+.distribute-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}

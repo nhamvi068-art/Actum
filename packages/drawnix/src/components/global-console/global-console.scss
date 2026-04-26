@@ -1,0 +1,929 @@
+@import "../../styles/variables.module.scss";
+
+// PreviewImageItem 在 global-console 中的样式
+.bottom-input-bar__preview-skeleton {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  flex-shrink: 0;
+}
+
+// 缩略图容器
+.bottom-input-bar__preview-image-item {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: visible;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+    display: block;
+  }
+}
+
+// ── 预览大图（FloatingPortal 挂到 body，需扁平选择器，不依赖缩略图祖先）────────────
+// 注意：React 通过 {open && ...} 控制显隐，CSS 只需要定义可见状态下的样式
+.bottom-input-bar__preview-tooltip {
+  position: fixed;
+  z-index: 9999 !important;
+  // pointer-events: auto 确保 hover 检测正常
+  pointer-events: auto;
+  // 默认可见（React 的 open && 条件已控制显隐）
+  opacity: 1;
+  visibility: visible;
+  // 使用 transition 让位置变化平滑，避免从左上角跳到目标位置的视觉问题
+  transition: transform 0.15s ease-out, opacity 0.15s ease-out;
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+
+  img {
+    width: 140px;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 8px;
+    display: block;
+  }
+}
+
+// 选中图片的大图（object-fit: contain + 浅灰底）
+.bottom-input-bar__preview-tooltip--selected {
+  img {
+    object-fit: contain;
+    background: #f0f0f0;
+  }
+}
+
+// 缩略图右上角删除按钮
+.bottom-input-bar__remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s ease;
+  color: #888;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  pointer-events: auto;
+  z-index: 10;
+  // 扩大点击热区
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+
+  &:hover {
+    background: #ff4d4f;
+    color: white;
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(255, 77, 79, 0.4);
+  }
+
+  &:active {
+    transform: scale(1);
+  }
+}
+
+.bottom-input-bar__preview-image-item:hover .bottom-input-bar__remove-btn {
+  opacity: 1;
+}
+
+.global-console {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 680px;
+  z-index: 100;
+
+  // 拖拽状态
+  &--dragging {
+    .global-console__container {
+      border: 1px dashed #4d9fff;
+      background: rgba(77, 159, 255, 0.03);
+    }
+  }
+
+  // 拖拽覆盖层
+  &__drop-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 28px;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    animation: fadeIn 0.2s ease;
+  }
+
+  &__drop-overlay-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #5b8def;
+    pointer-events: none;
+
+    svg {
+      animation: bounce 1s ease infinite;
+      opacity: 0.9;
+    }
+
+    span {
+      font-size: 14px;
+      font-weight: 500;
+    }
+  }
+
+  &__drop-overlay-hint {
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    color: #8fa3cc !important;
+    margin-top: 2px;
+  }
+
+  // 主容器
+  &__container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 28px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    padding: 10px;
+    transition: all 0.3s ease;
+  }
+
+  // 顶部扩展区 - 选中图片预览
+  &__context-area {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.4s ease-in-out;
+    padding: 0 8px;
+
+    &--visible {
+      max-height: 80px;
+      opacity: 1;
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+  }
+
+  &__context-content {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: visible;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    scrollbar-width: none;
+  }
+
+  &__context-image {
+    display: flex;
+    align-items: center;
+    background: rgba(248, 248, 248, 0.8);
+    border-radius: 14px;
+    padding: 8px 12px;
+    border: 1px solid rgba(232, 232, 232, 0.8);
+    transition: background 0.2s ease;
+    position: relative;
+
+    &:hover {
+      background: rgba(244, 244, 245, 1);
+
+      .global-console__context-image-remove {
+        opacity: 1;
+      }
+    }
+
+    &-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background-size: cover;
+      background-position: center;
+      margin-right: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(232, 232, 232, 0.5);
+    }
+
+    &-info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    &-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      line-height: 1.3;
+    }
+
+    &-desc {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    &-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: all 0.2s ease;
+      color: #999;
+
+      &:hover {
+        background: #fee;
+        color: #e00;
+        transform: scale(1.1);
+      }
+    }
+  }
+
+  // 柔和分割线
+  &__divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(228, 228, 228, 0.8), transparent);
+    margin: 4px 8px;
+  }
+
+  // 表单
+  &__form {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  // 输入行
+  &__input-row {
+    display: flex;
+    align-items: flex-end;
+    padding: 6px 10px;
+    gap: 4px;
+  }
+
+  // 输入框
+  &__input {
+    flex: 1;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333;
+    background: transparent;
+    max-height: 120px;
+    min-height: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 4px 0;
+    box-shadow: none !important;
+
+    &:focus {
+      outline: none;
+      box-shadow: none !important;
+    }
+
+    &::placeholder {
+      color: #bbb;
+      font-weight: 300;
+    }
+  }
+
+  // 图标按钮
+  &__icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: #666;
+    }
+
+    &:active {
+      background: rgba(0, 0, 0, 0.08);
+      transform: translateY(-1px);
+    }
+
+    &--active {
+      background: rgba(0, 0, 0, 0.06);
+      color: #333;
+    }
+  }
+
+  // 更多菜单容器
+  &__more-menu-container {
+    position: relative;
+  }
+
+  // 底部工具栏
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px 6px;
+    gap: 8px;
+  }
+
+  &__toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__toolbar-divider {
+    width: 1px;
+    height: 14px;
+    background: rgba(0, 0, 0, 0.1);
+    margin: 0 6px;
+  }
+
+  // 参数组
+  &__params-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 4px;
+  }
+
+  // 下拉菜单包装器
+  &__dropdown-wrapper {
+    position: relative;
+  }
+
+  // 模式切换按钮
+  &__mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: #333;
+    }
+
+    &--active {
+      background: rgba(0, 0, 0, 0.06);
+      color: #111;
+    }
+
+    svg:last-child {
+      color: #999;
+    }
+  }
+
+  &__mode-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &--generate {
+      color: #ec4899;
+    }
+
+    &--agent {
+      color: #6366f1;
+    }
+  }
+
+  &__mode-label {
+    white-space: nowrap;
+  }
+
+  // 模型/技能选择按钮
+  &__selector-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: #333;
+    }
+
+    &--active {
+      background: rgba(0, 0, 0, 0.06);
+      color: #111;
+    }
+
+    svg:last-child {
+      color: #999;
+    }
+  }
+
+  &__selector-icon {
+    font-size: 14px;
+  }
+
+  &__selector-label {
+    white-space: nowrap;
+  }
+
+  // 参数按钮
+  &__param-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: #333;
+    }
+
+    &--active {
+      background: rgba(0, 0, 0, 0.06);
+      color: #111;
+    }
+
+    svg:last-child {
+      color: #999;
+    }
+  }
+
+  // 下拉菜单
+  &__dropdown {
+    position: absolute;
+    bottom: 100%;
+    margin-bottom: 8px;
+    min-width: 160px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(228, 228, 228, 0.8);
+    padding: 8px;
+    z-index: 1000;
+    overflow: hidden;
+    animation: slideInFromBottom 0.2s ease;
+    transform-origin: bottom right;
+
+    &--mode {
+      left: 0;
+      transform-origin: bottom left;
+      min-width: 140px;
+    }
+
+    &--model {
+      left: 0;
+      transform-origin: bottom left;
+      min-width: 180px;
+    }
+
+    &--skill {
+      left: 0;
+      transform-origin: bottom left;
+      min-width: 200px;
+    }
+
+    &--presets {
+      right: 0;
+      transform-origin: bottom right;
+      min-width: 200px;
+    }
+
+    &--resolution {
+      left: 0;
+      transform-origin: bottom left;
+      min-width: 100px;
+    }
+
+    &--ratio {
+      right: 0;
+      transform-origin: bottom right;
+      min-width: 260px;
+      max-height: none;
+      overflow: visible;
+      padding: 6px 8px 10px;
+    }
+  }
+
+  &__dropdown-header {
+    padding: 8px 12px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  &__dropdown-group-title {
+    padding: 10px 12px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #999;
+    letter-spacing: 0;
+  }
+
+  &__dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin: 2px 0;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-size: 13px;
+    color: #444;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    &--selected {
+      background: rgba(0, 0, 0, 0.05);
+      color: #111;
+    }
+
+    &--selected-skill {
+      background: rgba(99, 102, 241, 0.08);
+      color: #4f46e5;
+    }
+  }
+
+  &__dropdown-item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: #999;
+
+    &--generate {
+      color: #ec4899;
+    }
+
+    &--agent {
+      color: #6366f1;
+    }
+
+    &--active {
+      color: #4f46e5;
+    }
+  }
+
+  &__dropdown-item-label {
+    flex: 1;
+    font-size: 13px;
+    color: inherit;
+    white-space: nowrap;
+  }
+
+  &__dropdown-item-check {
+    display: flex;
+    align-items: center;
+    color: #111;
+    margin-left: auto;
+  }
+
+  // 比例菜单专用样式
+  &__dropdown--ratio &__dropdown-group-title {
+    padding: 14px 8px 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #aaa;
+    letter-spacing: 0;
+    margin-top: 2px;
+
+    &:first-child {
+      margin-top: 0;
+      padding-top: 6px;
+    }
+  }
+
+  &__dropdown-item--ratio {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    margin: 1px 0;
+    border-radius: 10px;
+    transition: background 0.15s ease;
+    cursor: pointer;
+
+    &:hover:not(&--selected) {
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 10px;
+    }
+
+    &--selected {
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 10px;
+
+      & .global-console__dropdown-item-label {
+        font-weight: 600;
+        color: #000;
+      }
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.07);
+        border-radius: 10px;
+      }
+    }
+  }
+
+  // 比例菜单中的 RatioIcon（使用 bottom-input-bar 的类名，样式已在 bottom-input-bar.scss 定义）
+  .bottom-input-bar__dropdown-item-icon-ratio {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+
+    svg {
+      display: block;
+    }
+  }
+
+  &__dropdown--ratio &__dropdown-item-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+    min-width: 36px;
+    flex-shrink: 0;
+  }
+
+  &__dropdown-item-desc {
+    font-size: 11px;
+    color: #b0b0b0;
+    margin-left: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  &__dropdown-item--ratio &__dropdown-item-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    color: #222;
+    flex-shrink: 0;
+  }
+
+  // 提交按钮
+  &__submit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.06);
+    color: #bbb;
+    cursor: not-allowed;
+    transition: all 0.3s ease;
+
+    &--active {
+      background: #111;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+      &:hover {
+        background: #333;
+        transform: scale(1.05);
+      }
+
+      &:active {
+        transform: scale(0.98);
+      }
+    }
+
+    &--generating {
+      background: #ff6b00;
+      color: white;
+      cursor: wait;
+    }
+  }
+
+  &__spinning {
+    animation: spin 1s linear infinite;
+  }
+
+  // 参考图上传按钮
+  &__ref-image-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: #666;
+    }
+
+    &:active {
+      background: rgba(0, 0, 0, 0.08);
+      transform: translateY(-1px);
+    }
+  }
+
+  // 隐藏的文件输入框
+  &__ref-image-input {
+    display: none;
+  }
+}
+
+// 动画
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// Mobile styles
+@include isMobile {
+  .global-console {
+    bottom: 16px;
+    width: calc(100% - 32px);
+    max-width: none;
+
+    &__container {
+      padding: 8px;
+      border-radius: 20px;
+    }
+
+    &__input {
+      font-size: 14px;
+    }
+
+    &__toolbar {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    &__mode-btn,
+    &__selector-btn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    &__submit-btn {
+      width: 32px;
+      height: 32px;
+    }
+
+    &__context-image {
+      padding: 6px 10px;
+
+      &-thumb {
+        width: 36px;
+        height: 36px;
+      }
+
+      &-name {
+        font-size: 12px;
+      }
+    }
+  }
+}

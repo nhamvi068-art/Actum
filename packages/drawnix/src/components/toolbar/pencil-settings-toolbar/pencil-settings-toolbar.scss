@@ -1,0 +1,282 @@
+// Pencil Settings Toolbar Styles
+// Template: Modern rounded toolbar with subtle shadows and hover effects
+// Border-radius: 40px is set via style prop in TSX.
+
+.pencil-settings-island {
+  user-select: none;
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  // Template styles: subtle shadow and refined border
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: #fff;
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  }
+}
+
+.pencil-settings-container {
+  display: flex;
+  align-items: center;
+  gap: 16px; // Template spacing
+  min-height: 40px; // Increased for more breathing room
+  padding: 0 16px; // Horizontal padding
+}
+
+.pencil-settings-section {
+  display: flex;
+  align-items: center;
+
+  // Compress slider vertical space
+  &--slider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+  }
+}
+
+.pencil-settings-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #f3f4f6; // Template divider color
+  flex-shrink: 0;
+}
+
+// 线条样式下拉选择器
+.pencil-settings-line-style-dropdown {
+  position: relative;
+}
+
+.line-style-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 56px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  .chevron {
+    margin-left: 4px;
+    color: #9ca3af;
+    transition: transform 0.2s ease;
+
+    &.rotated {
+      transform: rotate(180deg);
+    }
+  }
+
+  &:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  &.active {
+    background: #f3f4f6;
+    color: #111827;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+}
+
+// 透明遮罩
+.line-style-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+// 下拉菜单
+.line-style-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 100px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  padding: 6px;
+  z-index: 50;
+  animation: fadeIn 0.15s ease, slideInFromTop 0.15s ease;
+}
+
+.line-style-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  .line-style-icon {
+    width: 24px;
+    height: 20px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  &.selected {
+    background: #eff6ff;
+    color: #3b82f6;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+  }
+}
+
+// 笔刷粗细数值展示
+.pencil-settings-stroke-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+  min-width: 20px;
+  text-align: center;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+// 笔刷形状切换
+.pencil-settings-shape-toggle {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.shape-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(.active) {
+    color: #6b7280;
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  &.active {
+    background: #fff;
+    color: #3b82f6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 1px;
+  }
+}
+
+// 横向工具条内压缩滑块垂直留白
+.pencil-settings-island .slider-container {
+  padding: 0;
+  min-width: 60px;
+}
+
+// 禁用状态：保持全透明度，只阻止交互
+.pencil-settings-island .slider-container.disabled {
+  opacity: 1;
+  cursor: default;
+
+  .slider-track,
+  .slider-thumb {
+    cursor: default;
+  }
+}
+
+// 局部缩小轨道与拇指，匹配纤细高度
+.pencil-settings-island .slider-container .slider-track {
+  height: 3px;
+  border-radius: 1.5px;
+}
+
+.pencil-settings-island .slider-container .slider-thumb {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+// 动画
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+// 使用 fadeIn 动画，与父容器的 contextual-toolbar-layer 样式保持一致
+// 避免 slideDown 动画可能带来的位置跳动问题
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    margin-top: -8px;
+  }
+  to {
+    opacity: 1;
+    margin-top: 0;
+  }
+}

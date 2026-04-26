@@ -1,0 +1,40 @@
+// Pen Settings Toolbar Styles
+
+.pen-settings-island {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pen-settings-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+
+.pen-settings-section {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.pen-settings-divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--island-border-color, #E5E7EB);
+  flex-shrink: 0;
+}
+
+.pen-settings-preview {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+
+  svg {
+    display: block;
+  }
+}
